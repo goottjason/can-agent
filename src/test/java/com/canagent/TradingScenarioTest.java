@@ -181,11 +181,11 @@ class TradingScenarioTest {
     private CanSlimResult createStrongBuyCanSlimResult() {
         return new CanSlimResult(
                 testStock.getCode(), testStock.getName(), new BigDecimal("90"),
-                new CanSlimResult.QuarterlyEarnings(new BigDecimal("25"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("25"), "성장"),
-                new CanSlimResult.AnnualEarnings(new BigDecimal("25"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("25"), "성장"),
-                new CanSlimResult.MarketPosition(new BigDecimal("20"), true, "1위", "선도주"),
-                new CanSlimResult.SupplyDemand(new BigDecimal("20"), BigDecimal.TEN, BigDecimal.TEN, new BigDecimal("2"), "증가"),
-                new CanSlimResult.MarketDirection(new BigDecimal("20"), "강세", "강세"),
+                new CanSlimResult.QuarterlyEarnings(new BigDecimal("20"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("25"), "성장"),
+                new CanSlimResult.AnnualEarnings(new BigDecimal("20"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("25"), "성장"),
+                new CanSlimResult.MarketPosition(new BigDecimal("15"), true, "1위", "선도주"),
+                new CanSlimResult.SupplyDemand(new BigDecimal("15"), BigDecimal.TEN, BigDecimal.TEN, new BigDecimal("2"), "증가"),
+                new CanSlimResult.MarketDirection(new BigDecimal("15"), "강세", "강세"),
                 java.util.Map.of()
         );
     }
@@ -193,9 +193,9 @@ class TradingScenarioTest {
     private CanSlimResult createHighScoreCanSlimResult() {
         return new CanSlimResult(
                 testStock.getCode(), testStock.getName(), new BigDecimal("75"),
-                new CanSlimResult.QuarterlyEarnings(new BigDecimal("20"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("20"), "성장"),
-                new CanSlimResult.AnnualEarnings(new BigDecimal("20"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("20"), "성장"),
-                new CanSlimResult.MarketPosition(new BigDecimal("15"), true, "2위", "선도주"),
+                new CanSlimResult.QuarterlyEarnings(new BigDecimal("16"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("20"), "성장"),
+                new CanSlimResult.AnnualEarnings(new BigDecimal("16"), BigDecimal.TEN, BigDecimal.ONE, new BigDecimal("20"), "성장"),
+                new CanSlimResult.MarketPosition(new BigDecimal("12"), true, "2위", "선도주"),
                 new CanSlimResult.SupplyDemand(new BigDecimal("10"), BigDecimal.TEN, BigDecimal.TEN, new BigDecimal("1"), "보통"),
                 new CanSlimResult.MarketDirection(new BigDecimal("10"), "보통", "보통"),
                 java.util.Map.of()

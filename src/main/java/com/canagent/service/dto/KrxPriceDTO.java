@@ -55,4 +55,19 @@ public class KrxPriceDTO {
     public String getLowPrice() { return lowPrice; }
     public String getTradingQuantity() { return tradingQuantity; }
     public String getTradingPrice() { return tradingPrice; }
+    public String getListedStockCount() { return listedStockCount; }
+
+    public void setBaseDate(String baseDate) { this.baseDate = baseDate; }
+    public void setStockCode(String stockCode) { this.stockCode = stockCode; }
+    public void setIsinCode(String isinCode) { this.isinCode = isinCode; }
+    public void setItemName(String itemName) { this.itemName = itemName; }
+    public void setClosingPrice(String closingPrice) { this.closingPrice = closingPrice; }
+    public void setChangeAmount(String changeAmount) { this.changeAmount = changeAmount; }
+    public void setFluctuationRate(String fluctuationRate) { this.fluctuationRate = fluctuationRate; }
+    public void setOpeningPrice(String openingPrice) { this.openingPrice = openingPrice; }
+    public void setHighPrice(String highPrice) { this.highPrice = highPrice; }
+    public void setLowPrice(String lowPrice) { this.lowPrice = lowPrice; }
+    public void setTradingQuantity(String tradingQuantity) { this.tradingQuantity = tradingQuantity; }
+    public void setTradingPrice(String tradingPrice) { this.tradingPrice = tradingPrice; }
+    public void setListedStockCount(String listedStockCount) { this.listedStockCount = listedStockCount; }
 }

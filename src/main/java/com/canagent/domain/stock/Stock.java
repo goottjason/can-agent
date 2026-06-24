@@ -48,6 +48,7 @@ public class Stock {
     public String getSector() { return sector; }
     public boolean isActive() { return active; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 
     public void updateInfo(String name, String sector) {
         this.name = name;

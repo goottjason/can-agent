@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAN Agent - 종목 관리</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .nav { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav a { text-decoration: none; color: #666; padding: 8px 16px; border-radius: 5px; transition: all 0.2s; }
+        .nav a:hover { background: #f0f0f0; }
+        .nav a.active { background: #3498db; color: white; }
+        .search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-bar input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
+        .search-bar select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
+        .search-bar button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .search-bar button:hover { background: #2980b9; }
+        .action-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #229954; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+        .stats-row { display: flex; gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; text-align: center; }
+        .stat-card h4 { color: #666; font-size: 0.85rem; margin-bottom: 5px; }
+        .stat-card .number { font-size: 1.5rem; font-weight: bold; color: #333; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { background: white; margin: 10% auto; padding: 30px; border-radius: 8px; width: 90%; max-width: 500px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #333; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .alert { padding: 12px 20px; border-radius: 5px; margin-bottom: 15px; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+        .badge-active { background: #d4edda; color: #155724; }
+        .badge-inactive { background: #f8d7da; color: #721c24; }
+        .market-tag { padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+        .market-kospi { background: #e3f2fd; color: #1565c0; }
+        .market-kosdaq { background: #fff3e0; color: #e65100; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <a th:href="@{/}">대시보드</a>
+            <a th:href="@{/stocks}" class="active">종목 관리</a>
+        </nav>
+
+        <header>
+            <h1>종목 관리</h1>
+            <p class="subtitle">KRX 상장종목 검색, 등록, 관리</p>
+        </header>
+
+        <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
+        <div th:if="${errorMessage}" class="alert alert-error" th:text="${errorMessage}"></div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <h4>전체 활성 종목</h4>
+                <div class="number" th:text="${totalActiveCount}">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>KOSPI</h4>
+                <div class="number" th:text="${kospiCount}">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>KOSDAQ</h4>
+                <div class="number" th:text="${kosdaqCount}">0</div>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <form th:action="@{/stocks}" method="get" style="display: flex; gap: 10px; flex: 1;">
+                <input type="text" name="keyword" th:value="${keyword}" placeholder="종목명 또는 코드 검색...">
+                <select name="market">
+                    <option value="">전체 시장</option>
+                    <option value="KOSPI" th:selected="${market == 'KOSPI'}">KOSPI</option>
+                    <option value="KOSDAQ" th:selected="${market == 'KOSDAQ'}">KOSDAQ</option>
+                </select>
+                <button type="submit" class="btn btn-primary">검색</button>
+            </form>
+        </div>
+
+        <div class="action-bar">
+            <button class="btn btn-success" onclick="openRegisterModal()">+ 종목 등록</button>
+            <form th:action="@{/stocks/sync}" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-primary">KRX 동기화</button>
+            </form>
+        </div>
+
+        <section>
+            <div th:if="${#lists.isEmpty(stocks)}" class="empty-state">
+                등록된 종목이 없습니다. KRX 동기화 또는 수동 등록을 이용해주세요.
+            </div>
+            <table th:unless="${#lists.isEmpty(stocks)}">
+                <thead>
+                    <tr>
+                        <th>코드</th>
+                        <th>종목명</th>
+                        <th>시장</th>
+                        <th>상태</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="stock : ${stocks}">
+                        <td>
+                            <a th:href="@{/stocks/{id}(id=${stock.id})}" th:text="${stock.code}" style="color: #3498db; text-decoration: none;"></a>
+                        </td>
+                        <td>
+                            <a th:href="@{/stocks/{id}(id=${stock.id})}" th:text="${stock.name}" style="color: #333; text-decoration: none; font-weight: 500;"></a>
+                        </td>
+                        <td>
+                            <span class="market-tag"
+                                  th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
+                                  th:text="${stock.market}">KOSPI</span>
+                        </td>
+                        <td>
+                            <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
+                                  th:text="${stock.active} ? '활성' : '비활성'">활성</span>
+                        </td>
+                        <td>
+                            <div th:if="${stock.active}">
+                                <form th:action="@{/stocks/{id}/deactivate(id=${stock.id})}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm">비활성화</button>
+                                </form>
+                            </div>
+                            <div th:unless="${stock.active}">
+                                <form th:action="@{/stocks/{id}/activate(id=${stock.id})}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-success btn-sm">활성화</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <footer>
+            <p>CAN Agent v0.1.0 - William O'Neil 전략 기반 자동매매 시스템</p>
+        </footer>
+    </div>
+
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>종목 등록</h3>
+                <button class="modal-close" onclick="closeRegisterModal()">&times;</button>
+            </div>
+            <form th:action="@{/stocks}" method="post">
+                <div class="form-group">
+                    <label for="code">종목 코드</label>
+                    <input type="text" id="code" name="code" required placeholder="예: 005930" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label for="name">종목명</label>
+                    <input type="text" id="name" name="name" required placeholder="예: 삼성전자" maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="market">시장</label>
+                    <select id="market" name="market" required>
+                        <option value="KOSPI">KOSPI</option>
+                        <option value="KOSDAQ">KOSDAQ</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sector">업종 (선택)</label>
+                    <input type="text" id="sector" name="sector" placeholder="예: 반도체">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn" onclick="closeRegisterModal()">취소</button>
+                    <button type="submit" class="btn btn-primary">등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openRegisterModal() {
+            document.getElementById('registerModal').style.display = 'block';
+        }
+        function closeRegisterModal() {
+            document.getElementById('registerModal').style.display = 'none';
+        }
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('registerModal')) {
+                closeRegisterModal();
+            }
+        }
+    </script>
+</body>
+</html>

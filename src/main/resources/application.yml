@@ -34,13 +34,36 @@ api:
     key: ${DART_API_KEY:}
   krx:
     key: ${KRX_API_KEY:}
+  korea-investment:
+    app-key: ${KOREA_INVESTMENT_APP_KEY:}
+    app-secret: ${KOREA_INVESTMENT_APP_SECRET:}
+    account-number: ${KOREA_INVESTMENT_ACCOUNT_NUMBER:}
+    is-real: ${KOREA_INVESTMENT_IS_REAL:false}
 
 # 자동매매 스케줄
 trading:
   scheduler:
     enabled: true
-    cron: "0 0 9 * * MON-FRI" # 평일 오전 9시
-  max-positions: 10           # 최대 보유 종목 수
-  position-size: 1000000      # 1건당 투자 금액 (100만원)
-  stop-loss-rate: 7           # 손절 기준 (%)
-  take-profit-rate: 20        # 익절 기준 (%)
+    cron: "0 0 9 * * MON-FRI"              # 평일 오전 9시 (자동매매)
+    sync-cron: "0 30 15 * * MON-FRI"       # 평일 오후 3시 30분 (주가 동기화)
+    quarterly-cron: "0 0 10 1 1,4,7,10 *"  # 분기별 재무제표 동기화
+    price-cron: "0 */5 9-15 * * MON-FRI"   # 장중 5분마다 현재가 갱신
+    close-price-cron: "0 0 16 * * MON-FRI" # 장 마감 후 종가 갱신
+  max-positions: 10              # 최대 보유 종목 수
+  position-size: 1000000         # 1건당 투자 금액 (100만원)
+  stop-loss-rate: 7              # 손절 기준 (%)
+  take-profit-rate: 20           # 익절 기준 (%)
+  real-trading: false            # 실제 매매 실행 여부 (true: 실전, false: 시뮬레이션)
+
+# 알림 설정
+notification:
+  enabled: true
+  telegram:
+    enabled: false
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+  kakao:
+    enabled: false
+    webhook-url: ${KAKAO_WEBHOOK_URL:}
+  console:
+    enabled: true                # 콘솔 로그 알림 (항상 권장)

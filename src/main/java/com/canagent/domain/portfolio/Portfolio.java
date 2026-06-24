@@ -66,6 +66,8 @@ public class Portfolio {
     public BigDecimal getProfitAmount() { return profitAmount; }
     public BigDecimal getProfitRate() { return profitRate; }
     public boolean isActive() { return active; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 
     public void updateCurrentPrice(BigDecimal currentPrice) {
         this.currentPrice = currentPrice;

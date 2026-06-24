@@ -1,5 +1,6 @@
 package com.canagent.service;
 
+import com.canagent.config.ApiConfig;
 import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.trading.Trade;
@@ -10,6 +11,7 @@ import com.canagent.service.analysis.CanSlimAnalysisService;
 import com.canagent.service.analysis.CupAndHandleAnalyzer;
 import com.canagent.service.dto.CanSlimResult;
 import com.canagent.service.dto.CupAndHandleResult;
+import com.canagent.service.dto.KoreaInvestmentOrderResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +31,8 @@ public class TradingStrategyService {
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
     private final PortfolioRepository portfolioRepository;
     private final TradeRepository tradeRepository;
+    private final KoreaInvestmentApiClient koreaInvestmentApiClient;
+    private final ApiConfig apiConfig;
 
     @Value("${trading.max-positions:10}")
     private int maxPositions;
@@ -42,15 +46,22 @@ public class TradingStrategyService {
     @Value("${trading.take-profit-rate:20}")
     private BigDecimal takeProfitRate;
 
+    @Value("${trading.real-trading:false}")
+    private boolean realTrading;
+
     public TradingStrategyService(
             CanSlimAnalysisService canSlimAnalysisService,
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
             PortfolioRepository portfolioRepository,
-            TradeRepository tradeRepository) {
+            TradeRepository tradeRepository,
+            KoreaInvestmentApiClient koreaInvestmentApiClient,
+            ApiConfig apiConfig) {
         this.canSlimAnalysisService = canSlimAnalysisService;
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
         this.portfolioRepository = portfolioRepository;
         this.tradeRepository = tradeRepository;
+        this.koreaInvestmentApiClient = koreaInvestmentApiClient;
+        this.apiConfig = apiConfig;
     }
 
     public TradingDecision evaluateBuy(Stock stock, BigDecimal currentPrice) {
@@ -134,6 +145,17 @@ public class TradingStrategyService {
 
     @Transactional
     public Trade executeBuy(Stock stock, int quantity, BigDecimal price, String reason) {
+        log.info("매수 실행: {} {}주 @ {}원 - {}", stock.getName(), quantity, price, reason);
+
+        if (realTrading) {
+            KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.buy(
+                    stock.getCode(), quantity, price.intValue());
+            if (!response.isSuccess()) {
+                log.error("한국투자증권 매수 주문 실패: {}", response.getMsg1());
+                throw new RuntimeException("매수 주문 실패: " + response.getMsg1());
+            }
+        }
+
         Trade trade = new Trade(stock, TradeType.BUY, quantity, price, reason);
 
         Optional<Portfolio> existing = portfolioRepository.findByStockIdAndActiveTrue(stock.getId());
@@ -151,6 +173,17 @@ public class TradingStrategyService {
 
     @Transactional
     public Trade executeSell(Stock stock, int quantity, BigDecimal price, String reason) {
+        log.info("매도 실행: {} {}주 @ {}원 - {}", stock.getName(), quantity, price, reason);
+
+        if (realTrading) {
+            KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.sell(
+                    stock.getCode(), quantity, price.intValue());
+            if (!response.isSuccess()) {
+                log.error("한국투자증권 매도 주문 실패: {}", response.getMsg1());
+                throw new RuntimeException("매도 주문 실패: " + response.getMsg1());
+            }
+        }
+
         Trade trade = new Trade(stock, TradeType.SELL, quantity, price, reason);
 
         Optional<Portfolio> portfolioOpt = portfolioRepository.findByStockIdAndActiveTrue(stock.getId());

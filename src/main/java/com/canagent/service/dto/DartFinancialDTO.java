@@ -36,4 +36,13 @@ public class DartFinancialDTO {
     public String getPreviousAmount() { return previousAmount; }
     public String getFsDivision() { return fsDivision; }
     public String getAccountName() { return accountName; }
+
+    public void setReceiptNo(String receiptNo) { this.receiptNo = receiptNo; }
+    public void setStockCode(String stockCode) { this.stockCode = stockCode; }
+    public void setReportCode(String reportCode) { this.reportCode = reportCode; }
+    public void setBusinessYear(String businessYear) { this.businessYear = businessYear; }
+    public void setCurrentAmount(String currentAmount) { this.currentAmount = currentAmount; }
+    public void setPreviousAmount(String previousAmount) { this.previousAmount = previousAmount; }
+    public void setFsDivision(String fsDivision) { this.fsDivision = fsDivision; }
+    public void setAccountName(String accountName) { this.accountName = accountName; }
 }

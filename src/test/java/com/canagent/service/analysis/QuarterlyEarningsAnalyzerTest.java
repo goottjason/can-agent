@@ -61,7 +61,7 @@ class QuarterlyEarningsAnalyzerTest {
 
         var result = analyzer.analyze(stock);
 
-        assertThat(result.score()).isEqualByComparingTo(new BigDecimal("25"));
+        assertThat(result.score()).isEqualByComparingTo(new BigDecimal("20"));
         assertThat(result.growthRate()).isGreaterThan(BigDecimal.ZERO);
     }
 

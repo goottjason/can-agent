@@ -21,16 +21,22 @@ public class CanSlimAnalysisService {
     private final AnnualEarningsAnalyzer annualEarningsAnalyzer;
     private final SupplyDemandAnalyzer supplyDemandAnalyzer;
     private final MarketDirectionAnalyzer marketDirectionAnalyzer;
+    private final IndustryLeaderAnalyzer industryLeaderAnalyzer;
+    private final InstitutionalInvestorAnalyzer institutionalInvestorAnalyzer;
 
     public CanSlimAnalysisService(
             QuarterlyEarningsAnalyzer quarterlyEarningsAnalyzer,
             AnnualEarningsAnalyzer annualEarningsAnalyzer,
             SupplyDemandAnalyzer supplyDemandAnalyzer,
-            MarketDirectionAnalyzer marketDirectionAnalyzer) {
+            MarketDirectionAnalyzer marketDirectionAnalyzer,
+            IndustryLeaderAnalyzer industryLeaderAnalyzer,
+            InstitutionalInvestorAnalyzer institutionalInvestorAnalyzer) {
         this.quarterlyEarningsAnalyzer = quarterlyEarningsAnalyzer;
         this.annualEarningsAnalyzer = annualEarningsAnalyzer;
         this.supplyDemandAnalyzer = supplyDemandAnalyzer;
         this.marketDirectionAnalyzer = marketDirectionAnalyzer;
+        this.industryLeaderAnalyzer = industryLeaderAnalyzer;
+        this.institutionalInvestorAnalyzer = institutionalInvestorAnalyzer;
     }
 
     public CanSlimResult analyze(Stock stock) {
@@ -40,17 +46,23 @@ public class CanSlimAnalysisService {
         var annual = annualEarningsAnalyzer.analyze(stock);
         var supply = supplyDemandAnalyzer.analyze(stock);
         var market = marketDirectionAnalyzer.analyze(stock);
+        var leader = industryLeaderAnalyzer.analyze(stock);
+        var institutional = institutionalInvestorAnalyzer.analyze(stock);
 
         BigDecimal totalScore = quarterly.score()
                 .add(annual.score())
                 .add(supply.score())
-                .add(market.score());
+                .add(market.score())
+                .add(leader.score())
+                .add(institutional.score());
 
         Map<String, String> details = new HashMap<>();
         details.put("분기 실적", quarterly.reason());
         details.put("연간 실적", annual.reason());
         details.put("수급", supply.reason());
         details.put("시장 방향", market.reason());
+        details.put("업종 선도주", leader.reason());
+        details.put("기관 투자자", institutional.reason());
 
         QuarterlyEarnings quarterlyResult = new QuarterlyEarnings(
                 quarterly.score(),
@@ -82,11 +94,16 @@ public class CanSlimAnalysisService {
                 market.reason()
         );
 
+        boolean isLeader = leader.sectorRank() != null && leader.sectorRank() <= 3;
+        String industryRank = leader.sectorRank() != null
+                ? String.format("%d/%d", leader.sectorRank(), leader.sectorRank())
+                : "N/A";
+
         MarketPosition positionResult = new MarketPosition(
-                BigDecimal.ZERO,
-                false,
-                "N/A",
-                "업종 선도주 분석 미구현"
+                leader.score(),
+                isLeader,
+                industryRank,
+                leader.reason()
         );
 
         CanSlimResult result = new CanSlimResult(
@@ -108,9 +125,9 @@ public class CanSlimAnalysisService {
     }
 
     private String determineMarketTrend(BigDecimal score) {
-        if (score.compareTo(new BigDecimal("20")) >= 0) {
+        if (score.compareTo(new BigDecimal("10")) >= 0) {
             return "강세";
-        } else if (score.compareTo(new BigDecimal("10")) >= 0) {
+        } else if (score.compareTo(new BigDecimal("5")) >= 0) {
             return "보통";
         } else {
             return "약세";

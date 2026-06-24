@@ -7,6 +7,8 @@ import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
+import com.canagent.service.notification.NotificationEvent;
+import com.canagent.service.notification.NotificationServiceRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,14 +29,17 @@ public class AutoTradingWorker {
     private final StockRepository stockRepository;
     private final StockPriceRepository stockPriceRepository;
     private final TradingStrategyService tradingStrategyService;
+    private final NotificationServiceRouter notificationServiceRouter;
 
     public AutoTradingWorker(
             StockRepository stockRepository,
             StockPriceRepository stockPriceRepository,
-            TradingStrategyService tradingStrategyService) {
+            TradingStrategyService tradingStrategyService,
+            NotificationServiceRouter notificationServiceRouter) {
         this.stockRepository = stockRepository;
         this.stockPriceRepository = stockPriceRepository;
         this.tradingStrategyService = tradingStrategyService;
+        this.notificationServiceRouter = notificationServiceRouter;
     }
 
     @Scheduled(cron = "${trading.scheduler.cron:0 0 9 * * MON-FRI}")
@@ -83,6 +88,7 @@ public class AutoTradingWorker {
             );
             log.info("매도 실행: {} {}주 @ {}원 - {}",
                     stock.getName(), sellDecision.quantity(), currentPrice, sellDecision.reason());
+            notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
             return;
         }
 
@@ -96,6 +102,7 @@ public class AutoTradingWorker {
             );
             log.info("매수 실행: {} {}주 @ {}원 - {}",
                     stock.getName(), buyDecision.quantity(), currentPrice, buyDecision.reason());
+            notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
         }
     }
 

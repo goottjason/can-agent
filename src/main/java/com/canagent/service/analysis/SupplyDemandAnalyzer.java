@@ -85,13 +85,13 @@ public class SupplyDemandAnalyzer {
 
     private BigDecimal calculateSupplyDemandScore(BigDecimal volumeRatio, boolean priceIncreasing) {
         if (volumeRatio.compareTo(new BigDecimal("2.0")) >= 0 && priceIncreasing) {
-            return new BigDecimal("20");
-        } else if (volumeRatio.compareTo(new BigDecimal("1.5")) >= 0 && priceIncreasing) {
             return new BigDecimal("15");
+        } else if (volumeRatio.compareTo(new BigDecimal("1.5")) >= 0 && priceIncreasing) {
+            return new BigDecimal("12");
         } else if (volumeRatio.compareTo(new BigDecimal("1.2")) >= 0) {
-            return new BigDecimal("10");
+            return new BigDecimal("9");
         } else {
-            return new BigDecimal("5");
+            return new BigDecimal("4");
         }
     }
 

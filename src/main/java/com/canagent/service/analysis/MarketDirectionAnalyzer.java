@@ -65,16 +65,16 @@ public class MarketDirectionAnalyzer {
         BigDecimal score = BigDecimal.ZERO;
 
         if (currentPrice != null && ma50 != null && currentPrice.compareTo(ma50) > 0) {
-            score = score.add(new BigDecimal("10"));
+            score = score.add(new BigDecimal("5"));
         }
 
         if (ma50 != null && ma200 != null && ma50.compareTo(ma200) > 0) {
-            score = score.add(new BigDecimal("10"));
+            score = score.add(new BigDecimal("5"));
         }
 
         if (currentPrice != null && ma50 != null && ma200 != null) {
             if (currentPrice.compareTo(ma50) > 0 && ma50.compareTo(ma200) > 0) {
-                score = score.add(new BigDecimal("10"));
+                score = score.add(new BigDecimal("5"));
             }
         }
 

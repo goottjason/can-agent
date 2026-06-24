@@ -17,4 +17,18 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     List<Stock> findByMarketAndActiveTrue(String market);
 
     List<Stock> findBySectorAndActiveTrue(String sector);
+
+    Optional<Stock> findByCodeAndActiveTrue(String code);
+
+    List<Stock> findByNameContainingIgnoreCase(String name);
+
+    List<Stock> findByCodeContainingOrNameContaining(String code, String name);
+
+    List<Stock> findByCodeContainingOrNameContainingAndActiveTrue(String code, String name);
+
+    boolean existsByCode(String code);
+
+    long countByActiveTrue();
+
+    long countByMarketAndActiveTrue(String market);
 }

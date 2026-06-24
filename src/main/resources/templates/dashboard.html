@@ -5,18 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CAN Agent - 자동매매 대시보드</title>
     <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .nav { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav a { text-decoration: none; color: #666; padding: 8px 16px; border-radius: 5px; transition: all 0.2s; }
+        .nav a:hover { background: #f0f0f0; }
+        .nav a.active { background: #3498db; color: white; }
+        .risk-alert { background: #fff3cd; border: 1px solid #ffc107; padding: 10px 15px; border-radius: 5px; margin-bottom: 15px; font-size: 0.9rem; }
+        .risk-alert.danger { background: #f8d7da; border-color: #dc3545; }
+        .sub-info { font-size: 0.8rem; color: #666; margin-top: 5px; }
+        .weight-badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+        .weight-normal { background: #d4edda; color: #155724; }
+        .weight-high { background: #fff3cd; color: #856404; }
+    </style>
 </head>
 <body>
     <div class="container">
+        <nav class="nav">
+            <a th:href="@{/}" class="active">대시보드</a>
+            <a th:href="@{/stocks}">종목 관리</a>
+        </nav>
+
         <header>
             <h1>CAN Agent</h1>
             <p class="subtitle">CANSLIM + 컵앤핸들 자동매매 시스템</p>
         </header>
 
+        <div class="risk-alert danger" th:if="${isMaxPositions}">
+            최대 보유 종목 수에 도달했습니다. 신규 매수가 불가합니다.
+        </div>
+        <div class="risk-alert" th:if="${isLowCash}">
+            투자 가능 금액이 부족합니다. 현재 포지션 관리가 필요합니다.
+        </div>
+
         <section class="summary">
             <div class="summary-card">
                 <h3>투자 금액</h3>
                 <p class="value" th:text="${#numbers.formatInteger(totalInvestment, 1, 'COMMA')} + '원'">0원</p>
+                <p class="sub-info" th:text="'보유: ' + ${portfolioCount} + '종목'">보유: 0종목</p>
             </div>
             <div class="summary-card">
                 <h3>현재 평가액</h3>
@@ -45,6 +70,14 @@
                 <span class="label">매도 횟수</span>
                 <span class="value" th:text="${sellCount} + '건'">0건</span>
             </div>
+            <div class="stat-item">
+                <span class="label">승률</span>
+                <span class="value" th:text="${winRate} + '%'">0%</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">손실 종목</span>
+                <span class="value" th:text="${lossCount} + '종목'">0종목</span>
+            </div>
             <form th:action="@{/trade/run}" method="post" class="manual-check">
                 <button type="submit">수동 검사 실행</button>
             </form>
@@ -63,6 +96,7 @@
                             <th>수량</th>
                             <th>매수가</th>
                             <th>현재가</th>
+                            <th>평가금액</th>
                             <th>수익률</th>
                         </tr>
                     </thead>
@@ -75,6 +109,7 @@
                             <td th:text="${p.quantity} + '주'">0주</td>
                             <td th:text="${#numbers.formatInteger(p.averageBuyPrice, 1, 'COMMA')} + '원'">0원</td>
                             <td th:text="${#numbers.formatInteger(p.currentPrice, 1, 'COMMA')} + '원'">0원</td>
+                            <td th:text="${#numbers.formatInteger(p.totalBuyAmount, 1, 'COMMA')} + '원'">0원</td>
                             <td th:classappend="${p.profitRate.doubleValue() >= 0} ? 'profit' : 'loss'"
                                 th:text="${#numbers.formatDecimal(p.profitRate, 1, 2)} + '%'">0%</td>
                         </tr>

@@ -62,13 +62,13 @@ public class AnnualEarningsAnalyzer {
 
     private BigDecimal calculateAnnualScore(BigDecimal growthRate) {
         if (growthRate.compareTo(new BigDecimal("25")) >= 0) {
-            return new BigDecimal("25");
-        } else if (growthRate.compareTo(new BigDecimal("10")) >= 0) {
             return new BigDecimal("20");
+        } else if (growthRate.compareTo(new BigDecimal("10")) >= 0) {
+            return new BigDecimal("16");
         } else if (growthRate.compareTo(new BigDecimal("5")) >= 0) {
-            return new BigDecimal("15");
+            return new BigDecimal("12");
         } else if (growthRate.compareTo(BigDecimal.ZERO) > 0) {
-            return new BigDecimal("10");
+            return new BigDecimal("8");
         } else {
             return BigDecimal.ZERO;
         }
