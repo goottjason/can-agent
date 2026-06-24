@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: can-agent
+
+  datasource:
+    url: jdbc:h2:mem:canagent
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  thymeleaf:
+    cache: false
+
+server:
+  port: 8080
+
+# 외부 API 설정
+api:
+  dart:
+    key: ${DART_API_KEY:}
+  krx:
+    key: ${KRX_API_KEY:}
+
+# 자동매매 스케줄
+trading:
+  scheduler:
+    enabled: true
+    cron: "0 0 9 * * MON-FRI" # 평일 오전 9시
+  max-positions: 10           # 최대 보유 종목 수
+  position-size: 1000000      # 1건당 투자 금액 (100만원)
+  stop-loss-rate: 7           # 손절 기준 (%)
+  take-profit-rate: 20        # 익절 기준 (%)
