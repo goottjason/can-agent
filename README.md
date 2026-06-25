@@ -490,7 +490,7 @@ http://localhost:8080
 
 ## 개발 로드맵
 
-상세한 개발 로드맵은 [ROADMAP.md](ROADMAP.md)를 참조하세요.
+상세한 개발 로드맵은 [docs/ROADMAP.md](docs/ROADMAP.md)를 참조하세요.
 
 | Phase | 목표 | 상태 |
 |-------|------|------|
