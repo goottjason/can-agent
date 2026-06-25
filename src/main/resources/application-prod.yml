@@ -1,0 +1,69 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:canagent}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  h2:
+    console:
+      enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  thymeleaf:
+    cache: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /can-agent
+
+# 외부 API 설정
+api:
+  dart:
+    key: ${DART_API_KEY}
+  krx:
+    key: ${KRX_API_KEY}
+  korea-investment:
+    app-key: ${KOREA_INVESTMENT_APP_KEY}
+    app-secret: ${KOREA_INVESTMENT_APP_SECRET}
+    account-number: ${KOREA_INVESTMENT_ACCOUNT_NUMBER}
+    is-real: ${KOREA_INVESTMENT_IS_REAL:true}
+
+# 자동매매 스케줄
+trading:
+  scheduler:
+    enabled: true
+    cron: "0 0 9 * * MON-FRI"
+    sync-cron: "0 30 15 * * MON-FRI"
+    quarterly-cron: "0 0 10 1,4,7,10 *"
+    price-cron: "0 */5 9-15 * * MON-FRI"
+    close-price-cron: "0 0 16 * * MON-FRI"
+  max-positions: 10
+  position-size: 1000000
+  stop-loss-rate: 7
+  take-profit-rate: 20
+  real-trading: true
+  secret: ${TRADE_SECRET:}
+
+# 알림 설정
+notification:
+  enabled: true
+  telegram:
+    enabled: true
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+  kakao:
+    enabled: true
+    webhook-url: ${KAKAO_WEBHOOK_URL:}
+  console:
+    enabled: false
