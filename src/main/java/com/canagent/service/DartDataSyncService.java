@@ -65,8 +65,10 @@ public class DartDataSyncService {
         BigDecimal operatingIncome = extractValue(financials, "영업이익");
         BigDecimal netIncome = extractValue(financials, "당기순이익");
         BigDecimal eps = extractValue(financials, "주당순이익");
+        BigDecimal roe = extractValue(financials, "자기자본이익률");
+        BigDecimal debtRatio = extractValue(financials, "부채비율");
 
-        statement.updateFinancials(revenue, operatingIncome, netIncome, eps, BigDecimal.ZERO, BigDecimal.ZERO);
+        statement.updateFinancials(revenue, operatingIncome, netIncome, eps, roe, debtRatio);
         financialStatementRepository.save(statement);
 
         log.info("재무제표 동기화 완료: {} - {}년 {}분기", stockCode, year, quarter);

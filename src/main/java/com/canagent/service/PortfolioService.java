@@ -1,7 +1,6 @@
 package com.canagent.service;
 
 import com.canagent.domain.portfolio.Portfolio;
-import com.canagent.domain.trading.Trade;
 import com.canagent.domain.trading.TradeType;
 import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.TradeRepository;
@@ -122,39 +121,16 @@ public class PortfolioService {
     }
 
     public Map<String, Object> getTradeStatistics() {
-        List<Trade> allTrades = tradeRepository.findAll();
+        long buyCount = tradeRepository.countByTradeType(TradeType.BUY);
+        long sellCount = tradeRepository.countByTradeType(TradeType.SELL);
 
-        long buyCount = allTrades.stream()
-                .filter(t -> t.getTradeType() == TradeType.BUY)
-                .count();
-        long sellCount = allTrades.stream()
-                .filter(t -> t.getTradeType() == TradeType.SELL)
-                .count();
+        BigDecimal totalBuyAmount = tradeRepository.sumTotalAmountByTradeType(TradeType.BUY);
+        BigDecimal totalSellAmount = tradeRepository.sumTotalAmountByTradeType(TradeType.SELL);
 
-        BigDecimal totalBuyAmount = allTrades.stream()
-                .filter(t -> t.getTradeType() == TradeType.BUY)
-                .map(Trade::getTotalAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long winningTrades = tradeRepository.countWinningSellTrades();
+        double winRate = sellCount > 0 ? (double) winningTrades / sellCount * 100 : 0;
 
-        BigDecimal totalSellAmount = allTrades.stream()
-                .filter(t -> t.getTradeType() == TradeType.SELL)
-                .map(Trade::getTotalAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        long winningTrades = allTrades.stream()
-                .filter(t -> t.getTradeType() == TradeType.SELL && t.getProfitRate() != null && t.getProfitRate().compareTo(BigDecimal.ZERO) > 0)
-                .count();
-
-        long totalSellTrades = allTrades.stream()
-                .filter(t -> t.getTradeType() == TradeType.SELL)
-                .count();
-
-        double winRate = totalSellTrades > 0 ? (double) winningTrades / totalSellTrades * 100 : 0;
-
-        LocalDateTime now = LocalDateTime.now();
-        List<Trade> recentTrades = allTrades.stream()
-                .filter(t -> t.getTradeDateTime().isAfter(now.minusDays(7)))
-                .toList();
+        long recentTradeCount = tradeRepository.countByTradeDateTimeAfter(LocalDateTime.now().minusDays(7));
 
         return Map.of(
                 "totalBuyCount", buyCount,
@@ -162,7 +138,7 @@ public class PortfolioService {
                 "totalBuyAmount", totalBuyAmount,
                 "totalSellAmount", totalSellAmount,
                 "winRate", BigDecimal.valueOf(winRate).setScale(1, RoundingMode.HALF_UP),
-                "recentTradeCount", recentTrades.size()
+                "recentTradeCount", recentTradeCount
         );
     }
 

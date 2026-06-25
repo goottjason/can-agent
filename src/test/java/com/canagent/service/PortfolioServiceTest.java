@@ -221,12 +221,12 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("매매 통계 조회")
     void getTradeStatistics_returnsAllFields() {
-        Stock stock = MockDataFactory.createSamsungStock();
-        Trade buyTrade = new Trade(stock, TradeType.BUY, 10, new BigDecimal("70000"), "테스트 매수");
-        Trade sellTrade = new Trade(stock, TradeType.SELL, 10, new BigDecimal("80000"), "테스트 매도");
-        sellTrade.setProfitRate(new BigDecimal("14.29"));
-
-        when(tradeRepository.findAll()).thenReturn(List.of(buyTrade, sellTrade));
+        when(tradeRepository.countByTradeType(TradeType.BUY)).thenReturn(1L);
+        when(tradeRepository.countByTradeType(TradeType.SELL)).thenReturn(1L);
+        when(tradeRepository.sumTotalAmountByTradeType(TradeType.BUY)).thenReturn(new BigDecimal("700000"));
+        when(tradeRepository.sumTotalAmountByTradeType(TradeType.SELL)).thenReturn(new BigDecimal("800000"));
+        when(tradeRepository.countWinningSellTrades()).thenReturn(1L);
+        when(tradeRepository.countByTradeDateTimeAfter(any())).thenReturn(2L);
 
         Map<String, Object> stats = portfolioService.getTradeStatistics();
 
@@ -241,10 +241,12 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("매매 통계 - 매도 없을 때 승률 0")
     void getTradeStatistics_noSells_winRateZero() {
-        Stock stock = MockDataFactory.createSamsungStock();
-        Trade buyTrade = new Trade(stock, TradeType.BUY, 10, new BigDecimal("70000"), "테스트 매수");
-
-        when(tradeRepository.findAll()).thenReturn(List.of(buyTrade));
+        when(tradeRepository.countByTradeType(TradeType.BUY)).thenReturn(1L);
+        when(tradeRepository.countByTradeType(TradeType.SELL)).thenReturn(0L);
+        when(tradeRepository.sumTotalAmountByTradeType(TradeType.BUY)).thenReturn(new BigDecimal("700000"));
+        when(tradeRepository.sumTotalAmountByTradeType(TradeType.SELL)).thenReturn(BigDecimal.ZERO);
+        when(tradeRepository.countWinningSellTrades()).thenReturn(0L);
+        when(tradeRepository.countByTradeDateTimeAfter(any())).thenReturn(1L);
 
         Map<String, Object> stats = portfolioService.getTradeStatistics();
 

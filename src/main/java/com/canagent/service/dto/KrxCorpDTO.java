@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class KrxCorpDTO {
 
-    @JsonProperty("srtn_cd")
+    @JsonProperty("srtnCd")
     private String stockCode;
 
-    @JsonProperty("itms_nm")
+    @JsonProperty("itmsNm")
     private String itemName;
 
     @JsonProperty("mrktCtg")

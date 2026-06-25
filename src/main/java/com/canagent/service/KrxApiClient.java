@@ -1,6 +1,7 @@
 package com.canagent.service;
 
 import com.canagent.config.ApiConfig;
+import com.canagent.service.dto.KrxApiResponse;
 import com.canagent.service.dto.KrxCorpDTO;
 import com.canagent.service.dto.KrxPriceDTO;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class KrxApiClient {
@@ -38,19 +40,13 @@ public class KrxApiClient {
                 .toUriString();
 
         try {
-            var response = restTemplate.getForObject(url, java.util.Map.class);
-            if (response != null) {
-                var body = (java.util.Map<String, Object>) response.get("response");
-                if (body != null) {
-                    var items = (java.util.Map<String, Object>) body.get("body");
-                    if (items != null) {
-                        var itemList = (java.util.List<java.util.Map<String, String>>) items.get("items");
-                        if (itemList != null) {
-                            return itemList.stream()
-                                    .map(this::mapToPriceDTO)
-                                    .toList();
-                        }
-                    }
+            KrxApiResponse response = restTemplate.getForObject(url, KrxApiResponse.class);
+            if (response != null && response.isSuccess()) {
+                List<Map<String, String>> items = response.getItems();
+                if (items != null) {
+                    return items.stream()
+                            .map(this::mapToPriceDTO)
+                            .toList();
                 }
             }
         } catch (Exception e) {
@@ -70,27 +66,16 @@ public class KrxApiClient {
                 .toUriString();
 
         try {
-            var response = restTemplate.getForObject(url, java.util.Map.class);
-            if (response != null) {
-                var body = (java.util.Map<String, Object>) response.get("response");
-                if (body != null) {
-                    var header = (java.util.Map<String, Object>) body.get("header");
-                    int resultCode = header != null ? ((Number) header.get("resultCode")).intValue() : -1;
-                    if (resultCode != 0) {
-                        log.warn("KRX 종목 리스트 API 응답 오류: {}", header != null ? header.get("resultMsg") : "unknown");
-                        return Collections.emptyList();
-                    }
-
-                    var items = (java.util.Map<String, Object>) body.get("body");
-                    if (items != null) {
-                        var itemList = (java.util.List<java.util.Map<String, String>>) items.get("items");
-                        if (itemList != null) {
-                            return itemList.stream()
-                                    .map(this::mapToCorpDTO)
-                                    .toList();
-                        }
-                    }
+            KrxApiResponse response = restTemplate.getForObject(url, KrxApiResponse.class);
+            if (response != null && response.isSuccess()) {
+                List<Map<String, String>> items = response.getItems();
+                if (items != null) {
+                    return items.stream()
+                            .map(this::mapToCorpDTO)
+                            .toList();
                 }
+            } else if (response != null) {
+                log.warn("KRX 종목 리스트 API 응답 오류: {}", response.getResultMsg());
             }
         } catch (Exception e) {
             log.error("KRX 종목 리스트 API 호출 실패: {}", e.getMessage());
@@ -100,7 +85,7 @@ public class KrxApiClient {
     }
 
     public List<KrxCorpDTO> getAllStockList(String baseDate) {
-        java.util.List<KrxCorpDTO> allStocks = new java.util.ArrayList<>();
+        List<KrxCorpDTO> allStocks = new java.util.ArrayList<>();
         int pageNo = 1;
         int numOfRows = 5000;
 
@@ -120,7 +105,7 @@ public class KrxApiClient {
         return allStocks;
     }
 
-    private KrxPriceDTO mapToPriceDTO(java.util.Map<String, String> item) {
+    private KrxPriceDTO mapToPriceDTO(Map<String, String> item) {
         var dto = new KrxPriceDTO();
         dto.setBaseDate(item.get("basDt"));
         dto.setStockCode(item.get("srtnCd"));
@@ -138,7 +123,7 @@ public class KrxApiClient {
         return dto;
     }
 
-    private KrxCorpDTO mapToCorpDTO(java.util.Map<String, String> item) {
+    private KrxCorpDTO mapToCorpDTO(Map<String, String> item) {
         var dto = new KrxCorpDTO();
         dto.setStockCode(item.get("srtnCd"));
         dto.setItemName(item.get("itmsNm"));

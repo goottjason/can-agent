@@ -24,4 +24,12 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     BigDecimal sumTotalAmountByTypeAndSince(@Param("type") TradeType type, @Param("since") LocalDateTime since);
 
     long countByTradeDateTimeAfter(LocalDateTime dateTime);
+
+    long countByTradeType(TradeType tradeType);
+
+    @Query("SELECT COALESCE(SUM(t.totalAmount), 0) FROM Trade t WHERE t.tradeType = :type")
+    BigDecimal sumTotalAmountByTradeType(@Param("type") TradeType type);
+
+    @Query("SELECT COUNT(t) FROM Trade t WHERE t.tradeType = com.canagent.domain.trading.TradeType.SELL AND t.profitRate IS NOT NULL AND t.profitRate > 0")
+    long countWinningSellTrades();
 }

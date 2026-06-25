@@ -17,9 +17,9 @@ public class KakaoNotificationService implements NotificationService {
     private final NotificationConfig config;
     private final RestTemplate restTemplate;
 
-    public KakaoNotificationService(NotificationConfig config) {
+    public KakaoNotificationService(NotificationConfig config, RestTemplate restTemplate) {
         this.config = config;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     @Override

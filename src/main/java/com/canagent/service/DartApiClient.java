@@ -2,6 +2,7 @@ package com.canagent.service;
 
 import com.canagent.config.ApiConfig;
 import com.canagent.service.dto.DartApiResponse;
+import com.canagent.service.dto.DartCompanyDTO;
 import com.canagent.service.dto.DartFinancialDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,9 +58,9 @@ public class DartApiClient {
                 .toUriString();
 
         try {
-            var response = restTemplate.getForObject(url, java.util.Map.class);
-            if (response != null && "000".equals(response.get("status"))) {
-                return (String) response.get("corp_name");
+            DartCompanyDTO response = restTemplate.getForObject(url, DartCompanyDTO.class);
+            if (response != null && "000".equals(response.getStatus())) {
+                return response.getCorpName();
             }
         } catch (Exception e) {
             log.error("DART 기업명 조회 실패: {}", e.getMessage());

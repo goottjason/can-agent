@@ -31,3 +31,7 @@ logs/
 *.db
 *.mv.db
 *.trace.db
+
+# SSH Keys
+*.key
+*.pem

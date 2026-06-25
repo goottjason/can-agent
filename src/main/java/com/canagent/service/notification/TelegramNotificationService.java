@@ -17,9 +17,9 @@ public class TelegramNotificationService implements NotificationService {
     private final NotificationConfig config;
     private final RestTemplate restTemplate;
 
-    public TelegramNotificationService(NotificationConfig config) {
+    public TelegramNotificationService(NotificationConfig config, RestTemplate restTemplate) {
         this.config = config;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     @Override

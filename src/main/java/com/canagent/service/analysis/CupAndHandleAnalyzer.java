@@ -11,6 +11,7 @@ import com.canagent.service.dto.CupAndHandleResult.PatternType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -41,6 +42,7 @@ public class CupAndHandleAnalyzer {
         this.patternRepository = patternRepository;
     }
 
+    @Transactional
     public CupAndHandleResult analyze(Stock stock) {
         log.info("컵앤핸들 분석 시작: {} ({})", stock.getName(), stock.getCode());
 
@@ -62,10 +64,24 @@ public class CupAndHandleAnalyzer {
 
         HandleInfo handleInfo = detectHandle(prices, cupInfo);
         if (handleInfo == null) {
+            CupAndHandlePattern pattern = new CupAndHandlePattern(
+                    stock, cupInfo.startDate, cupInfo.endDate,
+                    cupInfo.depth, cupInfo.high, cupInfo.low);
+            patternRepository.save(pattern);
             return buildCupOnlyResult(stock, cupInfo);
         }
 
         boolean breakout = detectBreakout(prices, handleInfo);
+
+        CupAndHandlePattern pattern = new CupAndHandlePattern(
+                stock, cupInfo.startDate, cupInfo.endDate,
+                cupInfo.depth, cupInfo.high, cupInfo.low);
+        pattern.startHandle(handleInfo.startDate);
+        pattern.completeHandle(handleInfo.endDate, handleInfo.depth);
+        if (breakout) {
+            pattern.breakout(LocalDate.now(), handleInfo.high);
+        }
+        patternRepository.save(pattern);
 
         return buildFullResult(stock, cupInfo, handleInfo, breakout);
     }
