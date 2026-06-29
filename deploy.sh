@@ -5,7 +5,7 @@ set -e
 
 SERVER="168.107.31.154"
 USER="ubuntu"
-KEY="/Users/jason/IdeaProjects/can-agent/ssh-key-2026-06-25.key"
+KEY="/Users/jasonair/Projects/can-agent/ssh-key-2026-06-25.key"
 REMOTE_DIR="~/projects/can-agent"
 
 echo "1. 빌드 중..."
