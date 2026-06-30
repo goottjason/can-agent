@@ -27,28 +27,40 @@ public class AnnualEarningsAnalyzer {
         }
 
         FinancialStatement currentYear = statements.get(0);
-
         FinancialStatement previousYear = findPreviousYearFullData(statements, currentYear.getFiscalYear());
 
-        if (previousYear == null || currentYear.getEps() == null || previousYear.getEps() == null) {
-            return new CanSlimElement(BigDecimal.ZERO, "연간 EPS 데이터 부족");
+        if (previousYear == null) {
+            return new CanSlimElement(BigDecimal.ZERO, "이전 연도 데이터 부족");
         }
 
-        BigDecimal currentEps = currentYear.getEps();
-        BigDecimal previousEps = previousYear.getEps();
+        BigDecimal currentVal = null;
+        BigDecimal previousVal = null;
+        String metric = "순이익";
 
-        if (previousEps.compareTo(BigDecimal.ZERO) == 0) {
-            return new CanSlimElement(BigDecimal.ZERO, "이전 연도 EPS가 0");
+        if (currentYear.getEps() != null && previousYear.getEps() != null
+                && currentYear.getEps().compareTo(BigDecimal.ZERO) != 0
+                && previousYear.getEps().compareTo(BigDecimal.ZERO) != 0) {
+            currentVal = currentYear.getEps();
+            previousVal = previousYear.getEps();
+            metric = "EPS";
+        } else if (currentYear.getNetIncome() != null && previousYear.getNetIncome() != null
+                && previousYear.getNetIncome().compareTo(BigDecimal.ZERO) != 0) {
+            currentVal = currentYear.getNetIncome();
+            previousVal = previousYear.getNetIncome();
         }
 
-        BigDecimal growthRate = currentEps.subtract(previousEps)
-                .divide(previousEps.abs(), 4, RoundingMode.HALF_UP)
+        if (currentVal == null || previousVal == null || previousVal.compareTo(BigDecimal.ZERO) == 0) {
+            return new CanSlimElement(BigDecimal.ZERO, "연간 수익 데이터 부족");
+        }
+
+        BigDecimal growthRate = currentVal.subtract(previousVal)
+                .divide(previousVal.abs(), 4, RoundingMode.HALF_UP)
                 .multiply(new BigDecimal("100"));
 
         BigDecimal score = calculateAnnualScore(growthRate);
-        String reason = String.format("연간 EPS 성장률: %.1f%%", growthRate);
+        String reason = String.format("연간 %s 성장률: %.1f%%", metric, growthRate);
 
-        return new CanSlimElement(score, reason, currentEps, previousEps, growthRate);
+        return new CanSlimElement(score, reason, currentVal, previousVal, growthRate);
     }
 
     private FinancialStatement findPreviousYearFullData(List<FinancialStatement> statements, int currentYear) {

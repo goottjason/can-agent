@@ -19,7 +19,7 @@ public class ApiConfig {
         private String key;
         private String baseUrl = "https://opendart.fss.or.kr/api";
 
-        public String getKey() { return key; }
+        public String getKey() { return env("DART_API_KEY", key); }
         public void setKey(String key) { this.key = key; }
         public String getBaseUrl() { return baseUrl; }
         public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
@@ -27,10 +27,10 @@ public class ApiConfig {
 
     public static class Krx {
         private String key;
-        private String baseUrl = "https://apis.data.go.kr/1160100/service/getStockPriceInfo";
+        private String baseUrl = "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService";
         private String stockListUrl = "https://apis.data.go.kr/1160100/service/GetKrxListedInfoService/getItemInfo";
 
-        public String getKey() { return key; }
+        public String getKey() { return env("KRX_API_KEY", key); }
         public void setKey(String key) { this.key = key; }
         public String getBaseUrl() { return baseUrl; }
         public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
@@ -47,13 +47,17 @@ public class ApiConfig {
         private String realBaseUrl = "https://openapi.koreainvestment.com:9443";
         private String mockBaseUrl = "https://openapivts.koreainvestment.com:29443";
 
-        public String getAppKey() { return appKey; }
+        public String getAppKey() { return env("KOREA_INVESTMENT_APP_KEY", appKey); }
         public void setAppKey(String appKey) { this.appKey = appKey; }
-        public String getAppSecret() { return appSecret; }
+        public String getAppSecret() { return env("KOREA_INVESTMENT_APP_SECRET", appSecret); }
         public void setAppSecret(String appSecret) { this.appSecret = appSecret; }
-        public String getAccountNumber() { return accountNumber; }
+        public String getAccountNumber() { return env("KOREA_INVESTMENT_ACCOUNT_NUMBER", accountNumber); }
         public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
-        public boolean isReal() { return isReal; }
+        public boolean isReal() {
+            String v = System.getenv("KOREA_INVESTMENT_IS_REAL");
+            if (v == null || v.isBlank()) v = System.getProperty("KOREA_INVESTMENT_IS_REAL");
+            return v != null ? Boolean.parseBoolean(v) : isReal;
+        }
         public void setReal(boolean real) { isReal = real; }
         public String getRealBaseUrl() { return realBaseUrl; }
         public void setRealBaseUrl(String realBaseUrl) { this.realBaseUrl = realBaseUrl; }
@@ -61,23 +65,27 @@ public class ApiConfig {
         public void setMockBaseUrl(String mockBaseUrl) { this.mockBaseUrl = mockBaseUrl; }
 
         public String getBaseUrl() {
-            return isReal ? realBaseUrl : mockBaseUrl;
+            return isReal() ? realBaseUrl : mockBaseUrl;
         }
 
         public String getAccountCode() {
-            if (accountNumber == null || accountNumber.isBlank()) {
-                return "";
-            }
-            String[] parts = accountNumber.split("-");
+            String acct = getAccountNumber();
+            if (acct == null || acct.isBlank()) return "";
+            String[] parts = acct.split("-");
             return parts.length > 1 ? parts[1] : "01";
         }
 
         public String getAccountMain() {
-            if (accountNumber == null || accountNumber.isBlank()) {
-                return "";
-            }
-            String[] parts = accountNumber.split("-");
+            String acct = getAccountNumber();
+            if (acct == null || acct.isBlank()) return "";
+            String[] parts = acct.split("-");
             return parts[0];
         }
+    }
+
+    private static String env(String name, String fallback) {
+        String v = System.getenv(name);
+        if (v == null || v.isBlank()) v = System.getProperty(name);
+        return (v != null && !v.isBlank()) ? v : fallback;
     }
 }

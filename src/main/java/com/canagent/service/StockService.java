@@ -95,10 +95,21 @@ public class StockService {
     @Transactional
     public int syncStockListFromKrx() {
         LocalDate today = LocalDate.now();
-        String baseDate = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        LocalDate baseDate = today;
+        int attempts = 0;
+        while (attempts < 7) {
+            List<KrxCorpDTO> testBatch = krxApiClient.getStockList(
+                    baseDate.format(DateTimeFormatter.ofPattern("yyyyMMdd")), 1, 1);
+            if (!testBatch.isEmpty()) {
+                break;
+            }
+            baseDate = baseDate.minusDays(1);
+            attempts++;
+        }
 
-        log.info("KRX 종목 리스트 동기화 시작: 기준일 {}", baseDate);
-        List<KrxCorpDTO> krxStocks = krxApiClient.getAllStockList(baseDate);
+        String baseDateStr = baseDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        log.info("KRX 종목 리스트 동기화 시작: 기준일 {}", baseDateStr);
+        List<KrxCorpDTO> krxStocks = krxApiClient.getAllStockList(baseDateStr);
 
         int registered = 0;
         int updated = 0;
@@ -106,6 +117,9 @@ public class StockService {
         for (KrxCorpDTO krxStock : krxStocks) {
             try {
                 String code = krxStock.getStockCode();
+                if (code != null && code.startsWith("A") && code.length() == 7) {
+                    code = code.substring(1);
+                }
                 Optional<Stock> existing = stockRepository.findByCode(code);
 
                 if (existing.isPresent()) {
@@ -136,7 +150,7 @@ public class StockService {
     public Stock activateStock(Long stockId) {
         Stock stock = stockRepository.findById(stockId)
                 .orElseThrow(() -> new IllegalArgumentException("종목을 찾을 수 없습니다: " + stockId));
-        stock.updateInfo(stock.getName(), stock.getSector());
+        stock.activate();
         return stockRepository.save(stock);
     }
 
@@ -162,5 +176,46 @@ public class StockService {
 
     public long getStockCountByMarket(String market) {
         return stockRepository.countByMarketAndActiveTrue(market);
+    }
+
+    @Transactional
+    public int registerPresetStocks() {
+        String[][] presets = {
+            {"005930", "삼성전자", "KOSPI"},
+            {"000660", "SK하이닉스", "KOSPI"},
+            {"035720", "카카오", "KOSPI"},
+            {"035420", "네이버", "KOSPI"},
+            {"005380", "현대차", "KOSPI"},
+            {"000270", "기아", "KOSPI"},
+            {"051910", "LG화학", "KOSPI"},
+            {"028260", "삼성물산", "KOSPI"},
+            {"006400", "삼성SDI", "KOSPI"},
+            {"012330", "현대모비스", "KOSPI"},
+            {"207940", "삼성바이오로직스", "KOSPI"},
+            {"068270", "셀트리온", "KOSPI"},
+            {"326030", "주성엔지니어링", "KOSDAQ"},
+            {"091640", "제이앤티지", "KOSDAQ"},
+            {"247540", "에코프로비엠", "KOSDAQ"},
+            {"122870", "유한양행", "KOSPI"},
+            {"015760", "한국전력", "KOSPI"},
+            {"008930", "한미 반도체", "KOSPI"},
+            {"105840", "두산퓨얼셀", "KOSPI"},
+            {"034730", "SK", "KOSPI"},
+        };
+
+        int registered = 0;
+        for (String[] p : presets) {
+            try {
+                if (!stockRepository.existsByCode(p[0])) {
+                    Stock stock = new Stock(p[0], p[1], p[2], p[2]);
+                    stockRepository.save(stock);
+                    registered++;
+                }
+            } catch (Exception e) {
+                log.warn("프리셋 종목 등록 실패: {} - {}", p[0], e.getMessage());
+            }
+        }
+        log.info("인기 종목 프리셋 등록 완료: {}건", registered);
+        return registered;
     }
 }

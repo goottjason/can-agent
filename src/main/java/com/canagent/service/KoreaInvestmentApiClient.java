@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -87,22 +88,39 @@ public class KoreaInvestmentApiClient {
 
     public KoreaInvestmentBalanceResponse getBalance() {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
-        String url = config.getBaseUrl() + BALANCE_PATH;
+        String cano = config.getAccountMain();
+        String acntPrdtCd = config.getAccountCode();
+        log.info("잔고 조회 파라미터: CANO={}, ACNT_PRDT_CD={}", cano, acntPrdtCd);
+
+        String url = UriComponentsBuilder.fromHttpUrl(config.getBaseUrl() + BALANCE_PATH)
+                .queryParam("CANO", cano)
+                .queryParam("ACNT_PRDT_CD", acntPrdtCd)
+                .queryParam("AFHR_FLPR_YN", "N")
+                .queryParam("OFL_YN", "")
+                .queryParam("INQR_DVSN", "02")
+                .queryParam("UNPR_DVSN", "01")
+                .queryParam("FUND_STTL_ICLD_YN", "N")
+                .queryParam("FNCG_AMT_AUTO_RDPT_YN", "N")
+                .queryParam("PRCS_DVSN", "00")
+                .queryParam("CTX_AREA_FK100", "")
+                .queryParam("CTX_AREA_NK100", "")
+                .toUriString();
 
         HttpHeaders headers = createHeaders(BALANCE_TR_ID);
         HttpEntity<Void> request = new HttpEntity<>(headers);
 
         try {
             ResponseEntity<KoreaInvestmentBalanceResponse> response = restTemplate.exchange(
-                    url, HttpMethod.GET, request, KoreaInvestmentBalanceResponse.class,
-                    buildBalanceParams(config));
+                    url, HttpMethod.GET, request, KoreaInvestmentBalanceResponse.class);
 
             if (response.getBody() != null && "0".equals(response.getBody().getRtCd())) {
                 log.info("잔고 조회 성공");
                 return response.getBody();
             }
 
-            log.error("잔고 조회 실패: {}", response.getBody());
+            log.error("잔고 조회 실패: rt_cd={}, msg1={}",
+                    response.getBody() != null ? response.getBody().getRtCd() : "null",
+                    response.getBody() != null ? response.getBody().getMsg1() : "null");
             return response.getBody();
         } catch (Exception e) {
             log.error("잔고 조회 API 호출 실패: {}", e.getMessage());
@@ -112,15 +130,18 @@ public class KoreaInvestmentApiClient {
 
     public KoreaInvestmentPriceResponse getCurrentPrice(String stockCode) {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
-        String url = config.getBaseUrl() + PRICE_PATH;
+
+        String url = UriComponentsBuilder.fromHttpUrl(config.getBaseUrl() + PRICE_PATH)
+                .queryParam("FID_COND_MKT_DIV_CODE", "J")
+                .queryParam("FID_ISCD", stockCode)
+                .toUriString();
 
         HttpHeaders headers = createHeaders(PRICE_TR_ID);
         HttpEntity<Void> request = new HttpEntity<>(headers);
 
         try {
             ResponseEntity<KoreaInvestmentPriceResponse> response = restTemplate.exchange(
-                    url, HttpMethod.GET, request, KoreaInvestmentPriceResponse.class,
-                    buildPriceParams(stockCode, config));
+                    url, HttpMethod.GET, request, KoreaInvestmentPriceResponse.class);
 
             if (response.getBody() != null && "0".equals(response.getBody().getRtCd())) {
                 return response.getBody();
@@ -146,26 +167,5 @@ public class KoreaInvestmentApiClient {
         return headers;
     }
 
-    private Map<String, Object> buildBalanceParams(ApiConfig.KoreaInvestment config) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("CANO", config.getAccountMain());
-        params.put("ACNT_PRDT_CD", config.getAccountCode());
-        params.put("AFHR_FLPR_YN", "N");
-        params.put("OFL_YN", "");
-        params.put("INQR_DVSN", "02");
-        params.put("UNPR_DVSN", "01");
-        params.put("FUND_STTL_ICLD_YN", "N");
-        params.put("FNCG_AMT_AUTO_RDPT_YN", "N");
-        params.put("PRCS_DVSN", "00");
-        params.put("CTX_AREA_FK100", "");
-        params.put("CTX_AREA_NK100", "");
-        return params;
-    }
 
-    private Map<String, Object> buildPriceParams(String stockCode, ApiConfig.KoreaInvestment config) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("FID_COND_MKT_DIV_CODE", "J");
-        params.put("FID_ISCD", stockCode);
-        return params;
-    }
 }

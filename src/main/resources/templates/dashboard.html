@@ -36,6 +36,30 @@
         <div class="risk-alert" th:if="${isLowCash}">
             투자 가능 금액이 부족합니다. 현재 포지션 관리가 필요합니다.
         </div>
+        <div class="risk-alert" th:if="${tradeResult}" style="background:#d4edda;border-color:#28a745;color:#155724;">
+            <span th:text="${tradeResult}"></span>
+        </div>
+
+        <div class="account-info">
+            <div class="account-card">
+                <h3>계좌 정보</h3>
+                <div class="account-detail">
+                    <span class="label">계좌번호</span>
+                    <span class="value" th:text="${accountNumber}">미설정</span>
+                </div>
+                <div class="account-status" th:if="${!accountConnected}">
+                    <span class="status disconnected">API 연결 실패</span>
+                </div>
+            </div>
+            <div class="account-card">
+                <h3>총 자산</h3>
+                <p class="value" th:text="${#numbers.formatInteger(totalAssetAmount, 1, 'COMMA')} + '원'">0원</p>
+            </div>
+            <div class="account-card">
+                <h3>주문 가능 금액</h3>
+                <p class="value" th:text="${#numbers.formatInteger(availableCashAmount, 1, 'COMMA')} + '원'">0원</p>
+            </div>
+        </div>
 
         <section class="summary">
             <div class="summary-card">
@@ -81,6 +105,15 @@
             <form th:action="@{/trade/run}" method="post" class="manual-check">
                 <button type="submit">수동 검사 실행</button>
             </form>
+            <form th:action="@{/sync/prices}" method="post" class="manual-check">
+                <button type="submit">가격 동기화</button>
+            </form>
+            <form th:action="@{/sync/financials}" method="post" class="manual-check">
+                <button type="submit">재무제표 동기화</button>
+            </form>
+            <form th:action="@{/sync/import-financials}" method="post" class="manual-check">
+                <button type="submit">재무제표 임포트 (20종목)</button>
+            </form>
         </section>
 
         <div class="content-grid">
@@ -106,7 +139,7 @@
                                 <span class="stock-name" th:text="${p.stock.name}">종목명</span>
                                 <span class="stock-code" th:text="'(' + ${p.stock.code} + ')'">(000000)</span>
                             </td>
-                            <td th:text="${p.quantity} + '주'">0주</td>
+                            <td th:text="${#numbers.formatDecimal(p.quantity, 1, 4)} + '주'">0주</td>
                             <td th:text="${#numbers.formatInteger(p.averageBuyPrice, 1, 'COMMA')} + '원'">0원</td>
                             <td th:text="${#numbers.formatInteger(p.currentPrice, 1, 'COMMA')} + '원'">0원</td>
                             <td th:text="${#numbers.formatInteger(p.totalBuyAmount, 1, 'COMMA')} + '원'">0원</td>
@@ -141,7 +174,7 @@
                             </td>
                             <td th:classappend="${t.tradeType.name() == 'BUY'} ? 'buy' : 'sell'"
                                 th:text="${t.tradeType.name() == 'BUY'} ? '매수' : '매도'">매수</td>
-                            <td th:text="${t.quantity} + '주'">0주</td>
+                            <td th:text="${#numbers.formatDecimal(t.quantity, 1, 4)} + '주'">0주</td>
                             <td th:text="${#numbers.formatInteger(t.price, 1, 'COMMA')} + '원'">0원</td>
                             <td class="reason" th:text="${t.reason}">사유</td>
                         </tr>

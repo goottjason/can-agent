@@ -56,6 +56,11 @@ public class Stock {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void activate() {
+        this.active = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public void deactivate() {
         this.active = false;
         this.updatedAt = LocalDateTime.now();

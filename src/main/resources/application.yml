@@ -50,7 +50,6 @@ trading:
     price-cron: "0 */5 9-15 * * MON-FRI"   # 장중 5분마다 현재가 갱신
     close-price-cron: "0 0 16 * * MON-FRI" # 장 마감 후 종가 갱신
   max-positions: 10              # 최대 보유 종목 수
-  position-size: 1000000         # 1건당 투자 금액 (100만원)
   stop-loss-rate: 7              # 손절 기준 (%)
   take-profit-rate: 20           # 익절 기준 (%)
   real-trading: false            # 실제 매매 실행 여부 (true: 실전, false: 시뮬레이션)

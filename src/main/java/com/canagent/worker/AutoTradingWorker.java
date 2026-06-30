@@ -66,15 +66,16 @@ public class AutoTradingWorker {
                 .findTopByStockIdOrderByDateDesc(stock.getId());
 
         if (latestPriceOpt.isEmpty()) {
-            log.debug("가격 데이터 없음: {} ({})", stock.getName(), stock.getCode());
+            log.info("가격 데이터 없음: {} ({}) id={}", stock.getName(), stock.getCode(), stock.getId());
             return;
         }
 
         StockPrice latestPrice = latestPriceOpt.get();
         BigDecimal currentPrice = latestPrice.getClose();
+        log.info("종목 분석: {} ({}) 가격={}", stock.getName(), stock.getCode(), currentPrice);
 
         if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) == 0) {
-            log.debug("유효하지 않은 가격: {} ({})", stock.getName(), stock.getCode());
+            log.info("유효하지 않은 가격: {} ({})", stock.getName(), stock.getCode());
             return;
         }
 
@@ -86,9 +87,11 @@ public class AutoTradingWorker {
                     currentPrice,
                     sellDecision.reason()
             );
-            log.info("매도 실행: {} {}주 @ {}원 - {}",
-                    stock.getName(), sellDecision.quantity(), currentPrice, sellDecision.reason());
-            notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+            if (trade != null) {
+                log.info("매도 실행: {} {}주 @ {}원 - {}",
+                        stock.getName(), sellDecision.quantity(), currentPrice, sellDecision.reason());
+                notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+            }
             return;
         }
 
@@ -100,9 +103,11 @@ public class AutoTradingWorker {
                     currentPrice,
                     buyDecision.reason()
             );
-            log.info("매수 실행: {} {}주 @ {}원 - {}",
-                    stock.getName(), buyDecision.quantity(), currentPrice, buyDecision.reason());
-            notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+            if (trade != null) {
+                log.info("매수 실행: {} {}주 @ {}원 - {}",
+                        stock.getName(), buyDecision.quantity(), currentPrice, buyDecision.reason());
+                notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+            }
         }
     }
 

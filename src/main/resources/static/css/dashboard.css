@@ -37,6 +37,66 @@ header .subtitle {
     font-size: 0.9rem;
 }
 
+.account-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.account-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.account-card h3 {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 10px;
+    font-weight: normal;
+}
+
+.account-card .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1a1a1a;
+}
+
+.account-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.account-detail .label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.account-detail .value {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.account-status {
+    margin-top: 10px;
+}
+
+.status {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.status.disconnected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
 .summary {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -210,6 +270,10 @@ footer {
 }
 
 @media (max-width: 768px) {
+    .account-info {
+        grid-template-columns: 1fr;
+    }
+
     .summary {
         grid-template-columns: repeat(2, 1fr);
     }

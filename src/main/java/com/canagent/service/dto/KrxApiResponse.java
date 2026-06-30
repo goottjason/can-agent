@@ -2,6 +2,8 @@ package com.canagent.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -14,15 +16,22 @@ public class KrxApiResponse {
     public void setResponse(KrxResponseBody response) { this.response = response; }
 
     public boolean isSuccess() {
-        return response != null && response.getHeader() != null && response.getHeader().getResultCode() == 0;
+        return response != null && response.getHeader() != null && "00".equals(response.getHeader().getResultCode());
     }
 
     public String getResultMsg() {
         return response != null && response.getHeader() != null ? response.getHeader().getResultMsg() : null;
     }
 
+    public int getTotalCount() {
+        return response != null && response.getBody() != null ? response.getBody().getTotalCount() : 0;
+    }
+
     public List<Map<String, String>> getItems() {
-        return response != null && response.getBody() != null ? response.getBody().getItems() : null;
+        if (response == null || response.getBody() == null || response.getBody().getItems() == null) {
+            return Collections.emptyList();
+        }
+        return response.getBody().getItems().getItems();
     }
 
     public static class KrxResponseBody {
@@ -42,23 +51,45 @@ public class KrxApiResponse {
     public static class KrxHeader {
 
         @JsonProperty("resultCode")
-        private int resultCode;
+        private String resultCode;
 
         @JsonProperty("resultMsg")
         private String resultMsg;
 
-        public int getResultCode() { return resultCode; }
-        public void setResultCode(int resultCode) { this.resultCode = resultCode; }
+        public String getResultCode() { return resultCode; }
+        public void setResultCode(String resultCode) { this.resultCode = resultCode; }
         public String getResultMsg() { return resultMsg; }
         public void setResultMsg(String resultMsg) { this.resultMsg = resultMsg; }
     }
 
     public static class KrxBody {
 
+        @JsonProperty("numOfRows")
+        private int numOfRows;
+
+        @JsonProperty("pageNo")
+        private int pageNo;
+
+        @JsonProperty("totalCount")
+        private int totalCount;
+
         @JsonProperty("items")
+        private KrxItems items;
+
+        public int getNumOfRows() { return numOfRows; }
+        public int getPageNo() { return pageNo; }
+        public int getTotalCount() { return totalCount; }
+        public KrxItems getItems() { return items; }
+    }
+
+    public static class KrxItems {
+
+        @JsonProperty("item")
         private List<Map<String, String>> items;
 
-        public List<Map<String, String>> getItems() { return items; }
-        public void setItems(List<Map<String, String>> items) { this.items = items; }
+        public List<Map<String, String>> getItems() {
+            if (items == null) return Collections.emptyList();
+            return items;
+        }
     }
 }

@@ -21,8 +21,8 @@ public class Trade {
     @Column(nullable = false)
     private TradeType tradeType;
 
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal quantity;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal price;
@@ -43,13 +43,13 @@ public class Trade {
 
     protected Trade() {}
 
-    public Trade(Stock stock, TradeType tradeType, int quantity,
+    public Trade(Stock stock, TradeType tradeType, BigDecimal quantity,
                  BigDecimal price, String reason) {
         this.stock = stock;
         this.tradeType = tradeType;
         this.quantity = quantity;
         this.price = price;
-        this.totalAmount = price.multiply(new BigDecimal(quantity));
+        this.totalAmount = price.multiply(quantity);
         this.reason = reason;
         this.tradeDateTime = LocalDateTime.now();
     }
@@ -57,7 +57,7 @@ public class Trade {
     public Long getId() { return id; }
     public Stock getStock() { return stock; }
     public TradeType getTradeType() { return tradeType; }
-    public Integer getQuantity() { return quantity; }
+    public BigDecimal getQuantity() { return quantity; }
     public BigDecimal getPrice() { return price; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public BigDecimal getCommission() { return commission; }

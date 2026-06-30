@@ -87,15 +87,63 @@ public class KrxDataSyncService {
     @Transactional
     public int syncAllActiveStocks(LocalDate startDate, LocalDate endDate) {
         List<Stock> activeStocks = stockRepository.findByActiveTrue();
-        int totalSaved = 0;
+        if (activeStocks.isEmpty()) {
+            return 0;
+        }
 
-        for (Stock stock : activeStocks) {
+        java.util.Set<String> activeCodes = new java.util.HashSet<>();
+        java.util.Map<String, Stock> codeToStock = new java.util.HashMap<>();
+        for (Stock s : activeStocks) {
+            activeCodes.add(s.getCode());
+            codeToStock.put(s.getCode(), s);
+        }
+
+        int totalSaved = 0;
+        LocalDate current = startDate;
+        while (!current.isAfter(endDate)) {
+            String dateStr = current.format(DATE_FORMAT);
             try {
-                int saved = syncDailyPrices(stock.getCode(), startDate, endDate);
-                totalSaved += saved;
+                List<KrxPriceDTO> allPrices = krxApiClient.getAllDailyPrices(dateStr);
+                for (KrxPriceDTO dto : allPrices) {
+                    String code = dto.getStockCode();
+                    if (!activeCodes.contains(code)) {
+                        continue;
+                    }
+                    Stock stock = codeToStock.get(code);
+                    try {
+                        LocalDate date = LocalDate.parse(dto.getBaseDate(), DATE_FORMAT);
+
+                        Optional<StockPrice> existing = stockPriceRepository
+                                .findByStockIdAndDateBetweenOrderByDateAsc(stock.getId(), date, date)
+                                .stream()
+                                .findFirst();
+
+                        if (existing.isPresent()) {
+                            continue;
+                        }
+
+                        StockPrice stockPrice = new StockPrice(
+                                stock,
+                                date,
+                                parseBigDecimal(dto.getOpeningPrice()),
+                                parseBigDecimal(dto.getHighPrice()),
+                                parseBigDecimal(dto.getLowPrice()),
+                                parseBigDecimal(dto.getClosingPrice()),
+                                parseLong(dto.getTradingQuantity())
+                        );
+
+                        stockPrice.setChangeRate(parseBigDecimal(dto.getFluctuationRate()));
+                        stockPriceRepository.save(stockPrice);
+                        totalSaved++;
+                    } catch (Exception e) {
+                        log.error("주가 데이터 저장 실패: {} - {}", code, e.getMessage());
+                    }
+                }
+                log.info("날짜 {} 동기화 완료: {}건 저장 (전체 {}건 중)", dateStr, totalSaved, allPrices.size());
             } catch (Exception e) {
-                log.error("종목 동기화 실패: {} ({}) - {}", stock.getName(), stock.getCode(), e.getMessage());
+                log.error("날짜 {} 데이터 조회 실패: {}", dateStr, e.getMessage());
             }
+            current = current.plusDays(1);
         }
 
         log.info("전체 주가 동기화 완료: {}건 저장", totalSaved);

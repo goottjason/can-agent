@@ -92,6 +92,9 @@
 
         <div class="action-bar">
             <button class="btn btn-success" onclick="openRegisterModal()">+ 종목 등록</button>
+            <form th:action="@{/stocks/preset}" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-success">인기 종목 20개 등록</button>
+            </form>
             <form th:action="@{/stocks/sync}" method="post" style="display: inline;">
                 <button type="submit" class="btn btn-primary">KRX 동기화</button>
             </form>

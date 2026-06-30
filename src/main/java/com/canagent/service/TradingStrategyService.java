@@ -9,9 +9,10 @@ import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.TradeRepository;
 import com.canagent.service.analysis.CanSlimAnalysisService;
 import com.canagent.service.analysis.CupAndHandleAnalyzer;
+import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
+import com.canagent.service.dto.KoreaInvestmentOrderResponse;
 import com.canagent.service.dto.CanSlimResult;
 import com.canagent.service.dto.CupAndHandleResult;
-import com.canagent.service.dto.KoreaInvestmentOrderResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,9 +37,6 @@ public class TradingStrategyService {
 
     @Value("${trading.max-positions:10}")
     private int maxPositions;
-
-    @Value("${trading.position-size:1000000}")
-    private BigDecimal positionSize;
 
     @Value("${trading.stop-loss-rate:7}")
     private BigDecimal stopLossRate;
@@ -83,22 +81,39 @@ public class TradingStrategyService {
             return TradingDecision.hold("최대 보유 종목 수 도달");
         }
 
+        // 실제 예수금 조회
+        KoreaInvestmentBalanceResponse balance = koreaInvestmentApiClient.getBalance();
+        if (!balance.isSuccess() || balance.getOutput2() == null || balance.getOutput2().isEmpty()) {
+            log.warn("잔고 조회 실패: {}", balance.getMsg1());
+            return TradingDecision.hold("잔고 조회 실패");
+        }
+
+        String availableCashStr = balance.getOutput2().get(0).getWithdrawableAmount();
+        BigDecimal availableCash = new BigDecimal(availableCashStr);
+        BigDecimal positionSize = availableCash.divide(new BigDecimal(maxPositions), 0, RoundingMode.FLOOR);
+        log.info("예수금: {}원, 종목당 배분: {}원", availableCash, positionSize);
+
+        if (positionSize.compareTo(new BigDecimal("1000")) < 0) {
+            return TradingDecision.hold("예수금 부족 (" + availableCash + "원)");
+        }
+
+        BigDecimal quantity = positionSize.divide(currentPrice, 4, RoundingMode.FLOOR);
+
         if (canSlimBuy && cupBuy) {
-            int quantity = positionSize.divide(currentPrice, 0, RoundingMode.FLOOR).intValue();
-            String reason = String.format("CANSLIM 점수: %s, 컵앤핸들: %s",
-                    canSlimResult.totalScore(), cupResult.reason());
+            String reason = String.format("CANSLIM 점수: %s, 컵앤핸들: %s, 예수금: %s원",
+                    canSlimResult.totalScore(), cupResult.reason(), availableCash);
             return TradingDecision.buy(quantity, reason);
         }
 
         if (canSlimBuy) {
-            int quantity = positionSize.divide(currentPrice, 0, RoundingMode.FLOOR).intValue();
-            String reason = String.format("CANSLIM 점수: %s (강력 매수)", canSlimResult.totalScore());
+            String reason = String.format("CANSLIM 점수: %s (강력 매수), 예수금: %s원",
+                    canSlimResult.totalScore(), availableCash);
             return TradingDecision.buy(quantity, reason);
         }
 
         if (cupBuy) {
-            int quantity = positionSize.divide(currentPrice, 0, RoundingMode.FLOOR).intValue();
-            String reason = String.format("컵앤핸들 패턴: %s", cupResult.reason());
+            String reason = String.format("컵앤핸들 패턴: %s, 예수금: %s원",
+                    cupResult.reason(), availableCash);
             return TradingDecision.buy(quantity, reason);
         }
 
@@ -144,15 +159,25 @@ public class TradingStrategyService {
     }
 
     @Transactional
-    public Trade executeBuy(Stock stock, int quantity, BigDecimal price, String reason) {
+    public Trade executeBuy(Stock stock, BigDecimal quantity, BigDecimal price, String reason) {
         log.info("매수 실행: {} {}주 @ {}원 - {}", stock.getName(), quantity, price, reason);
 
         if (realTrading) {
+            int intQty = quantity.setScale(0, RoundingMode.FLOOR).intValue();
+            if (intQty <= 0) {
+                log.warn("매수 수량 0 이하: {} (가격: {})", quantity, price);
+                return null;
+            }
             KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.buy(
-                    stock.getCode(), quantity, price.intValue());
+                    stock.getCode(), intQty, price.intValue());
             if (!response.isSuccess()) {
                 log.error("한국투자증권 매수 주문 실패: {}", response.getMsg1());
                 throw new RuntimeException("매수 주문 실패: " + response.getMsg1());
+            }
+        } else {
+            if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+                log.warn("매수 수량 0 이하 (시뮬레이션): {} (가격: {})", quantity, price);
+                return null;
             }
         }
 
@@ -172,15 +197,25 @@ public class TradingStrategyService {
     }
 
     @Transactional
-    public Trade executeSell(Stock stock, int quantity, BigDecimal price, String reason) {
+    public Trade executeSell(Stock stock, BigDecimal quantity, BigDecimal price, String reason) {
         log.info("매도 실행: {} {}주 @ {}원 - {}", stock.getName(), quantity, price, reason);
 
         if (realTrading) {
+            int intQty = quantity.setScale(0, RoundingMode.FLOOR).intValue();
+            if (intQty <= 0) {
+                log.warn("매도 수량 0 이하: {} (가격: {})", quantity, price);
+                return null;
+            }
             KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.sell(
-                    stock.getCode(), quantity, price.intValue());
+                    stock.getCode(), intQty, price.intValue());
             if (!response.isSuccess()) {
                 log.error("한국투자증권 매도 주문 실패: {}", response.getMsg1());
                 throw new RuntimeException("매도 주문 실패: " + response.getMsg1());
+            }
+        } else {
+            if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+                log.warn("매도 수량 0 이하 (시뮬레이션): {} (가격: {})", quantity, price);
+                return null;
             }
         }
 
@@ -203,27 +238,27 @@ public class TradingStrategyService {
 
     public record TradingDecision(
             TradeType action,
-            int quantity,
+            BigDecimal quantity,
             String reason
     ) {
-        public static TradingDecision buy(int quantity, String reason) {
+        public static TradingDecision buy(BigDecimal quantity, String reason) {
             return new TradingDecision(TradeType.BUY, quantity, reason);
         }
 
-        public static TradingDecision sell(int quantity, String reason) {
+        public static TradingDecision sell(BigDecimal quantity, String reason) {
             return new TradingDecision(TradeType.SELL, quantity, reason);
         }
 
         public static TradingDecision hold(String reason) {
-            return new TradingDecision(null, 0, reason);
+            return new TradingDecision(null, BigDecimal.ZERO, reason);
         }
 
         public boolean shouldBuy() {
-            return action == TradeType.BUY && quantity > 0;
+            return action == TradeType.BUY && quantity.compareTo(BigDecimal.ZERO) > 0;
         }
 
         public boolean shouldSell() {
-            return action == TradeType.SELL && quantity > 0;
+            return action == TradeType.SELL && quantity.compareTo(BigDecimal.ZERO) > 0;
         }
     }
 }

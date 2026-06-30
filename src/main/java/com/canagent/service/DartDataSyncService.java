@@ -5,14 +5,18 @@ import com.canagent.domain.stock.Stock;
 import com.canagent.repository.FinancialStatementRepository;
 import com.canagent.repository.StockRepository;
 import com.canagent.service.dto.DartFinancialDTO;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -30,6 +34,72 @@ public class DartDataSyncService {
         this.dartApiClient = dartApiClient;
         this.stockRepository = stockRepository;
         this.financialStatementRepository = financialStatementRepository;
+    }
+
+    @Transactional
+    public int importFromJsonFile(String filePath) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Map<String, Object>> data = mapper.readValue(
+                    new File(filePath),
+                    new TypeReference<Map<String, Map<String, Object>>>() {});
+
+            int imported = 0;
+            for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
+                Map<String, Object> record = entry.getValue();
+                String stockCode = (String) record.get("stock_code");
+                String year = (String) record.get("year");
+                String quarter = (String) record.get("quarter");
+                List<Map<String, String>> items = (List<Map<String, String>>) record.get("items");
+
+                if (stockCode == null || items == null) continue;
+
+                Optional<Stock> stockOpt = stockRepository.findByCode(stockCode);
+                if (stockOpt.isEmpty()) continue;
+
+                Stock stock = stockOpt.get();
+                Integer fiscalYear = Integer.parseInt(year);
+                Integer fiscalQuarter = Integer.parseInt(quarter);
+
+                Optional<FinancialStatement> existing = financialStatementRepository
+                        .findByStockIdAndFiscalYearAndFiscalQuarter(stock.getId(), fiscalYear, fiscalQuarter);
+
+                FinancialStatement statement;
+                if (existing.isPresent()) {
+                    statement = existing.get();
+                } else {
+                    statement = new FinancialStatement(stock, fiscalYear, fiscalQuarter, LocalDate.now());
+                }
+
+                BigDecimal revenue = extractValueFromMap(items, "매출액");
+                BigDecimal operatingIncome = extractValueFromMap(items, "영업이익");
+                BigDecimal netIncome = extractValueFromMap(items, "당기순이익");
+                if (netIncome.compareTo(BigDecimal.ZERO) == 0) {
+                    netIncome = extractValueFromMap(items, "당기순이익(손실)");
+                }
+                BigDecimal eps = extractValueFromMap(items, "주당순이익");
+                BigDecimal roe = extractValueFromMap(items, "자기자본이익률");
+                BigDecimal debtRatio = extractValueFromMap(items, "부채비율");
+
+                statement.updateFinancials(revenue, operatingIncome, netIncome, eps, roe, debtRatio);
+                financialStatementRepository.save(statement);
+                imported++;
+            }
+
+            log.info("DART JSON 임포트 완료: {}건 저장", imported);
+            return imported;
+        } catch (Exception e) {
+            log.error("DART JSON 임포트 실패: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    private BigDecimal extractValueFromMap(List<Map<String, String>> items, String accountName) {
+        return items.stream()
+                .filter(f -> accountName.equals(f.get("account_nm")))
+                .map(f -> parseBigDecimal(f.get("thstrm_amount")))
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
     }
 
     @Transactional
@@ -84,12 +154,16 @@ public class DartDataSyncService {
             try {
                 int result = syncFinancialStatements(stock.getCode(), year, quarter);
                 syncCount += result;
+                Thread.sleep(150);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
             } catch (Exception e) {
                 log.error("재무제표 동기화 실패: {} ({}) - {}", stock.getName(), stock.getCode(), e.getMessage());
             }
         }
 
-        log.info("전체 재무제표 동기화 완료: {}건 저장", syncCount);
+        log.info("전체 재무제표 동기화 완료: {}건 저장 ({}년 {}분기)", syncCount, year, quarter);
         return syncCount;
     }
 

@@ -1,9 +1,11 @@
 package com.canagent.service.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class KoreaInvestmentBalanceResponse {
 
     @JsonProperty("rt_cd")
@@ -43,29 +45,30 @@ public class KoreaInvestmentBalanceResponse {
         return response;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class BalanceItem {
-        @JsonProperty("PDNO")
+        @JsonProperty("pdno")
         private String stockCode;
 
-        @JsonProperty("PRDT_NAME")
+        @JsonProperty("prdt_name")
         private String stockName;
 
-        @JsonProperty("HLDG_QTY")
+        @JsonProperty("hldg_qty")
         private String holdingQuantity;
 
-        @JsonProperty("Pchs_avg_pric")
+        @JsonProperty("pchs_avg_pric")
         private String averageBuyPrice;
 
-        @JsonProperty("Evlu_amt")
+        @JsonProperty("evlu_amt")
         private String evaluationAmount;
 
-        @JsonProperty("Pchs_amt")
+        @JsonProperty("pchs_amt")
         private String purchaseAmount;
 
-        @JsonProperty("Tot_evlu_pfls_amt")
+        @JsonProperty("tot_evlu_pfls_amt")
         private String totalProfitLoss;
 
-        @JsonProperty("Fltt_rt")
+        @JsonProperty("fltt_rt")
         private String fluctuationRate;
 
         public String getStockCode() { return stockCode; }
@@ -86,26 +89,46 @@ public class KoreaInvestmentBalanceResponse {
         public void setFluctuationRate(String fluctuationRate) { this.fluctuationRate = fluctuationRate; }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AccountSummary {
-        @JsonProperty("Tot_asst_amt")
-        private String totalAssetAmount;
+        @JsonProperty("dnca_tot_amt")
+        private String depositTotalAmount;
 
-        @JsonProperty("Nsam_amt")
+        @JsonProperty("nass_amt")
         private String netAssetAmount;
 
-        @JsonProperty("Pchs_amt_smtl")
+        @JsonProperty("pchs_amt_smtl_amt")
         private String totalPurchaseAmount;
 
-        @JsonProperty("Frcr_use_psbl_amt")
-        private String availableCashAmount;
+        @JsonProperty("scts_evlu_amt")
+        private String stockEvaluationAmount;
 
-        public String getTotalAssetAmount() { return totalAssetAmount; }
-        public void setTotalAssetAmount(String totalAssetAmount) { this.totalAssetAmount = totalAssetAmount; }
+        @JsonProperty("tot_evlu_amt")
+        private String totalEvaluationAmount;
+
+        @JsonProperty("prvs_rcdl_excc_amt")
+        private String withdrawableAmount;
+
+        @JsonProperty("nxdy_excc_amt")
+        private String nextDayExccAmount;
+
+        public String getDepositTotalAmount() { return depositTotalAmount; }
         public String getNetAssetAmount() { return netAssetAmount; }
-        public void setNetAssetAmount(String netAssetAmount) { this.netAssetAmount = netAssetAmount; }
         public String getTotalPurchaseAmount() { return totalPurchaseAmount; }
-        public void setTotalPurchaseAmount(String totalPurchaseAmount) { this.totalPurchaseAmount = totalPurchaseAmount; }
-        public String getAvailableCashAmount() { return availableCashAmount; }
-        public void setAvailableCashAmount(String availableCashAmount) { this.availableCashAmount = availableCashAmount; }
+        public String getStockEvaluationAmount() { return stockEvaluationAmount; }
+        public String getTotalEvaluationAmount() { return totalEvaluationAmount; }
+        public String getWithdrawableAmount() { return withdrawableAmount; }
+        public String getNextDayExccAmount() { return nextDayExccAmount; }
+
+        public String getTotalAssetAmount() {
+            if (totalEvaluationAmount != null && !totalEvaluationAmount.isBlank()) return totalEvaluationAmount;
+            return "0";
+        }
+
+        public String getAvailableCashAmount() {
+            if (withdrawableAmount != null && !withdrawableAmount.isBlank()) return withdrawableAmount;
+            if (depositTotalAmount != null && !depositTotalAmount.isBlank()) return depositTotalAmount;
+            return "0";
+        }
     }
 }

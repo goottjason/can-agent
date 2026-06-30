@@ -30,25 +30,39 @@ public class QuarterlyEarningsAnalyzer {
         FinancialStatement current = statements.get(0);
         FinancialStatement previous = findSameQuarterPreviousYear(statements);
 
-        if (previous == null || current.getEps() == null || previous.getEps() == null) {
-            return new CanSlimElement(BigDecimal.ZERO, "EPS 데이터 부족");
+        if (previous == null) {
+            return new CanSlimElement(BigDecimal.ZERO, "이전 분기 데이터 부족");
         }
 
-        BigDecimal currentEps = current.getEps();
-        BigDecimal previousEps = previous.getEps();
+        // EPS가 있으면 EPS 사용, 없으면 순이익 사용
+        BigDecimal currentVal = null;
+        BigDecimal previousVal = null;
+        String metric = "순이익";
 
-        if (previousEps.compareTo(BigDecimal.ZERO) == 0) {
-            return new CanSlimElement(BigDecimal.ZERO, "이전 분기 EPS가 0");
+        if (current.getEps() != null && previous.getEps() != null
+                && current.getEps().compareTo(BigDecimal.ZERO) != 0
+                && previous.getEps().compareTo(BigDecimal.ZERO) != 0) {
+            currentVal = current.getEps();
+            previousVal = previous.getEps();
+            metric = "EPS";
+        } else if (current.getNetIncome() != null && previous.getNetIncome() != null
+                && previous.getNetIncome().compareTo(BigDecimal.ZERO) != 0) {
+            currentVal = current.getNetIncome();
+            previousVal = previous.getNetIncome();
         }
 
-        BigDecimal growthRate = currentEps.subtract(previousEps)
-                .divide(previousEps.abs(), 4, RoundingMode.HALF_UP)
+        if (currentVal == null || previousVal == null || previousVal.compareTo(BigDecimal.ZERO) == 0) {
+            return new CanSlimElement(BigDecimal.ZERO, "수익 데이터 부족");
+        }
+
+        BigDecimal growthRate = currentVal.subtract(previousVal)
+                .divide(previousVal.abs(), 4, RoundingMode.HALF_UP)
                 .multiply(new BigDecimal("100"));
 
         BigDecimal score = calculateQuarterlyScore(growthRate);
-        String reason = String.format("분기 EPS 성장률: %.1f%%", growthRate);
+        String reason = String.format("분기 %s 성장률: %.1f%%", metric, growthRate);
 
-        return new CanSlimElement(score, reason, currentEps, previousEps, growthRate);
+        return new CanSlimElement(score, reason, currentVal, previousVal, growthRate);
     }
 
     private FinancialStatement findSameQuarterPreviousYear(List<FinancialStatement> statements) {

@@ -30,11 +30,11 @@ public class StockController {
             Model model) {
         List<Stock> stocks;
         if (keyword != null && !keyword.isBlank()) {
-            stocks = stockService.searchStocks(keyword);
+            stocks = stockService.searchAllStocks(keyword);
         } else if (market != null && !market.isBlank()) {
             stocks = stockService.getStocksByMarket(market);
         } else {
-            stocks = stockService.getAllActiveStocks();
+            stocks = stockService.getAllStocks();
         }
 
         model.addAttribute("stocks", stocks);
@@ -100,6 +100,17 @@ public class StockController {
             redirectAttributes.addFlashAttribute("successMessage", "KRX 종목 리스트 동기화 완료: " + count + "건 신규 등록");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMessage", "동기화 실패: " + e.getMessage());
+        }
+        return "redirect:/stocks";
+    }
+
+    @PostMapping("/preset")
+    public String registerPresetStocks(RedirectAttributes redirectAttributes) {
+        try {
+            int count = stockService.registerPresetStocks();
+            redirectAttributes.addFlashAttribute("successMessage", "인기 종목 " + count + "건 등록 완료");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "등록 실패: " + e.getMessage());
         }
         return "redirect:/stocks";
     }

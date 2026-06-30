@@ -55,10 +55,10 @@ public record CanSlimResult(
     ) {}
 
     public boolean isBuySignal() {
-        return totalScore != null && totalScore.compareTo(new BigDecimal("70")) >= 0;
+        return totalScore != null && totalScore.compareTo(new BigDecimal("40")) >= 0;
     }
 
     public boolean isStrongBuy() {
-        return totalScore != null && totalScore.compareTo(new BigDecimal("85")) >= 0;
+        return totalScore != null && totalScore.compareTo(new BigDecimal("60")) >= 0;
     }
 }

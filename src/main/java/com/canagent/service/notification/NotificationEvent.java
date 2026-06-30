@@ -11,7 +11,7 @@ public record NotificationEvent(
         TradeType tradeType,
         String stockCode,
         String stockName,
-        int quantity,
+        BigDecimal quantity,
         BigDecimal price,
         BigDecimal totalAmount,
         BigDecimal profitRate,

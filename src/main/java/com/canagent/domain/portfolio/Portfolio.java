@@ -17,8 +17,8 @@ public class Portfolio {
     @JoinColumn(name = "stock_id", nullable = false)
     private Stock stock;
 
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal quantity;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal averageBuyPrice;
@@ -44,11 +44,11 @@ public class Portfolio {
 
     protected Portfolio() {}
 
-    public Portfolio(Stock stock, int quantity, BigDecimal averageBuyPrice) {
+    public Portfolio(Stock stock, BigDecimal quantity, BigDecimal averageBuyPrice) {
         this.stock = stock;
         this.quantity = quantity;
         this.averageBuyPrice = averageBuyPrice;
-        this.totalBuyAmount = averageBuyPrice.multiply(new BigDecimal(quantity));
+        this.totalBuyAmount = averageBuyPrice.multiply(quantity);
         this.currentPrice = averageBuyPrice;
         this.profitAmount = BigDecimal.ZERO;
         this.profitRate = BigDecimal.ZERO;
@@ -59,7 +59,7 @@ public class Portfolio {
 
     public Long getId() { return id; }
     public Stock getStock() { return stock; }
-    public Integer getQuantity() { return quantity; }
+    public BigDecimal getQuantity() { return quantity; }
     public BigDecimal getAverageBuyPrice() { return averageBuyPrice; }
     public BigDecimal getTotalBuyAmount() { return totalBuyAmount; }
     public BigDecimal getCurrentPrice() { return currentPrice; }
@@ -71,28 +71,27 @@ public class Portfolio {
 
     public void updateCurrentPrice(BigDecimal currentPrice) {
         this.currentPrice = currentPrice;
-        this.profitAmount = currentPrice.subtract(averageBuyPrice)
-                .multiply(new BigDecimal(quantity));
+        this.profitAmount = currentPrice.subtract(averageBuyPrice).multiply(quantity);
         this.profitRate = currentPrice.subtract(averageBuyPrice)
                 .divide(averageBuyPrice, 4, BigDecimal.ROUND_HALF_UP)
                 .multiply(new BigDecimal("100"));
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void addQuantity(int quantity, BigDecimal buyPrice) {
-        BigDecimal totalAmount = this.averageBuyPrice.multiply(new BigDecimal(this.quantity))
-                .add(buyPrice.multiply(new BigDecimal(quantity)));
-        this.quantity += quantity;
-        this.averageBuyPrice = totalAmount.divide(new BigDecimal(this.quantity), 2, BigDecimal.ROUND_HALF_UP);
-        this.totalBuyAmount = this.averageBuyPrice.multiply(new BigDecimal(this.quantity));
+    public void addQuantity(BigDecimal quantity, BigDecimal buyPrice) {
+        BigDecimal totalAmount = this.averageBuyPrice.multiply(this.quantity)
+                .add(buyPrice.multiply(quantity));
+        this.quantity = this.quantity.add(quantity);
+        this.averageBuyPrice = totalAmount.divide(this.quantity, 2, BigDecimal.ROUND_HALF_UP);
+        this.totalBuyAmount = this.averageBuyPrice.multiply(this.quantity);
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void reduceQuantity(int quantity) {
-        this.quantity -= quantity;
-        this.totalBuyAmount = this.averageBuyPrice.multiply(new BigDecimal(this.quantity));
+    public void reduceQuantity(BigDecimal quantity) {
+        this.quantity = this.quantity.subtract(quantity);
+        this.totalBuyAmount = this.averageBuyPrice.multiply(this.quantity);
         this.updatedAt = LocalDateTime.now();
-        if (this.quantity <= 0) {
+        if (this.quantity.compareTo(BigDecimal.ZERO) <= 0) {
             this.active = false;
         }
     }

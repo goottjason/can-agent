@@ -49,10 +49,9 @@ trading:
     price-cron: "0 */5 9-15 * * MON-FRI"
     close-price-cron: "0 0 16 * * MON-FRI"
   max-positions: 10
-  position-size: 1000000
   stop-loss-rate: 7
   take-profit-rate: 20
-  real-trading: true
+  real-trading: ${REAL_TRADING:true}
   secret: ${TRADE_SECRET:}
 
 # 알림 설정

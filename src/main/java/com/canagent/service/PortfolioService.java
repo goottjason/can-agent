@@ -87,7 +87,7 @@ public class PortfolioService {
             return BigDecimal.ZERO;
         }
         BigDecimal positionValue = portfolio.getCurrentPrice()
-                .multiply(new BigDecimal(portfolio.getQuantity()));
+                .multiply(portfolio.getQuantity());
         return positionValue
                 .divide(totalCurrentValue, 4, RoundingMode.HALF_UP)
                 .multiply(new BigDecimal("100"));
