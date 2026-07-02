@@ -12,6 +12,7 @@ import com.canagent.service.DartDataSyncService;
 import com.canagent.service.PortfolioService;
 import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
 import com.canagent.worker.AutoTradingWorker;
+import com.canagent.worker.IntradayMonitorWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -34,6 +37,7 @@ public class DashboardController {
     private final TradeRepository tradeRepository;
     private final PortfolioService portfolioService;
     private final AutoTradingWorker autoTradingWorker;
+    private final IntradayMonitorWorker intradayMonitorWorker;
     private final KoreaInvestmentApiClient koreaInvestmentApiClient;
     private final KrxDataSyncService krxDataSyncService;
     private final DartDataSyncService dartDataSyncService;
@@ -45,6 +49,7 @@ public class DashboardController {
             TradeRepository tradeRepository,
             PortfolioService portfolioService,
             @Autowired(required = false) AutoTradingWorker autoTradingWorker,
+            @Autowired(required = false) IntradayMonitorWorker intradayMonitorWorker,
             KoreaInvestmentApiClient koreaInvestmentApiClient,
             KrxDataSyncService krxDataSyncService,
             DartDataSyncService dartDataSyncService,
@@ -53,6 +58,7 @@ public class DashboardController {
         this.tradeRepository = tradeRepository;
         this.portfolioService = portfolioService;
         this.autoTradingWorker = autoTradingWorker;
+        this.intradayMonitorWorker = intradayMonitorWorker;
         this.koreaInvestmentApiClient = koreaInvestmentApiClient;
         this.krxDataSyncService = krxDataSyncService;
         this.dartDataSyncService = dartDataSyncService;
@@ -114,6 +120,13 @@ public class DashboardController {
         model.addAttribute("availableCashAmount", availableCashAmount);
         model.addAttribute("accountConnected", accountConnected);
 
+        // 모니터링 정보
+        boolean monitorActive = intradayMonitorWorker != null && intradayMonitorWorker.isMonitoring();
+        model.addAttribute("monitorActive", monitorActive);
+        model.addAttribute("monitorLastCheck", intradayMonitorWorker != null ? intradayMonitorWorker.getLastCheckTime() : null);
+        model.addAttribute("monitorSignalCount", intradayMonitorWorker != null ? intradayMonitorWorker.getLastSignalCount() : 0);
+        model.addAttribute("monitorSignals", intradayMonitorWorker != null ? intradayMonitorWorker.getLastSignals() : java.util.Collections.emptyList());
+
         return "dashboard";
     }
 
@@ -174,5 +187,21 @@ public class DashboardController {
             redirectAttributes.addFlashAttribute("tradeResult", "재무제표 임포트 실패: " + e.getMessage());
         }
         return "redirect:/";
+    }
+
+    @GetMapping("/api/monitor/status")
+    @ResponseBody
+    public java.util.Map<String, Object> getMonitorStatus() {
+        boolean active = intradayMonitorWorker != null && intradayMonitorWorker.isMonitoring();
+        java.time.LocalDateTime lastCheck = intradayMonitorWorker != null ? intradayMonitorWorker.getLastCheckTime() : null;
+        int signalCount = intradayMonitorWorker != null ? intradayMonitorWorker.getLastSignalCount() : 0;
+        java.util.List<java.util.Map<String, Object>> signals = intradayMonitorWorker != null ? intradayMonitorWorker.getLastSignals() : java.util.Collections.emptyList();
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("monitoring", active);
+        result.put("lastCheckTime", lastCheck != null ? lastCheck.toString() : "");
+        result.put("signalCount", signalCount);
+        result.put("signals", signals);
+        return result;
     }
 }

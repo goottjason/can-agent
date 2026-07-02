@@ -38,11 +38,17 @@ public class TradingStrategyService {
     @Value("${trading.max-positions:10}")
     private int maxPositions;
 
+    @Value("${trading.position-rate:10}")
+    private int positionRate;
+
     @Value("${trading.stop-loss-rate:7}")
     private BigDecimal stopLossRate;
 
     @Value("${trading.take-profit-rate:20}")
     private BigDecimal takeProfitRate;
+
+    @Value("${trading.min-score:60}")
+    private int minScore;
 
     @Value("${trading.real-trading:false}")
     private boolean realTrading;
@@ -81,7 +87,6 @@ public class TradingStrategyService {
             return TradingDecision.hold("최대 보유 종목 수 도달");
         }
 
-        // 실제 예수금 조회
         KoreaInvestmentBalanceResponse balance = koreaInvestmentApiClient.getBalance();
         if (!balance.isSuccess() || balance.getOutput2() == null || balance.getOutput2().isEmpty()) {
             log.warn("잔고 조회 실패: {}", balance.getMsg1());
@@ -90,30 +95,36 @@ public class TradingStrategyService {
 
         String availableCashStr = balance.getOutput2().get(0).getWithdrawableAmount();
         BigDecimal availableCash = new BigDecimal(availableCashStr);
-        BigDecimal positionSize = availableCash.divide(new BigDecimal(maxPositions), 0, RoundingMode.FLOOR);
-        log.info("예수금: {}원, 종목당 배분: {}원", availableCash, positionSize);
 
-        if (positionSize.compareTo(new BigDecimal("1000")) < 0) {
-            return TradingDecision.hold("예수금 부족 (" + availableCash + "원)");
+        BigDecimal totalScore = canSlimResult.totalScore().add(cupResult.score());
+        if (totalScore.compareTo(new BigDecimal(String.valueOf(minScore))) < 0) {
+            return TradingDecision.hold("점수 미충족: " + totalScore + " < " + minScore);
         }
 
-        BigDecimal quantity = positionSize.divide(currentPrice, 4, RoundingMode.FLOOR);
+        BigDecimal maxInvestAmount = availableCash.multiply(new BigDecimal(positionRate))
+                .divide(new BigDecimal("100"), 0, RoundingMode.FLOOR);
+
+        BigDecimal quantity = maxInvestAmount.divide(currentPrice, 0, RoundingMode.FLOOR);
+
+        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+            return TradingDecision.hold("매수 수량 0 (예수금: " + availableCash + "원)");
+        }
 
         if (canSlimBuy && cupBuy) {
-            String reason = String.format("CANSLIM 점수: %s, 컵앤핸들: %s, 예수금: %s원",
-                    canSlimResult.totalScore(), cupResult.reason(), availableCash);
+            String reason = String.format("강력 매수 - CANSLIM: %s, 컵앤핸들: %s, 예수금: %s원, 배분: %s원",
+                    canSlimResult.totalScore(), cupResult.score(), availableCash, maxInvestAmount);
             return TradingDecision.buy(quantity, reason);
         }
 
         if (canSlimBuy) {
-            String reason = String.format("CANSLIM 점수: %s (강력 매수), 예수금: %s원",
-                    canSlimResult.totalScore(), availableCash);
+            String reason = String.format("CANSLIM 매수 신호 - 점수: %s, 예수금: %s원, 배분: %s원",
+                    canSlimResult.totalScore(), availableCash, maxInvestAmount);
             return TradingDecision.buy(quantity, reason);
         }
 
         if (cupBuy) {
-            String reason = String.format("컵앤핸들 패턴: %s, 예수금: %s원",
-                    cupResult.reason(), availableCash);
+            String reason = String.format("컵앤핸들 매수 신호 - 패턴: %s, 점수: %s, 예수금: %s원, 배분: %s원",
+                    cupResult.patternType(), cupResult.score(), availableCash, maxInvestAmount);
             return TradingDecision.buy(quantity, reason);
         }
 

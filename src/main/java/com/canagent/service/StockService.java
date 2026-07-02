@@ -2,6 +2,7 @@ package com.canagent.service;
 
 import com.canagent.domain.stock.Stock;
 import com.canagent.repository.StockRepository;
+import com.canagent.service.dto.DartCompanyDTO;
 import com.canagent.service.dto.KrxCorpDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +21,12 @@ public class StockService {
 
     private final StockRepository stockRepository;
     private final KrxApiClient krxApiClient;
+    private final DartApiClient dartApiClient;
 
-    public StockService(StockRepository stockRepository, KrxApiClient krxApiClient) {
+    public StockService(StockRepository stockRepository, KrxApiClient krxApiClient, DartApiClient dartApiClient) {
         this.stockRepository = stockRepository;
         this.krxApiClient = krxApiClient;
+        this.dartApiClient = dartApiClient;
     }
 
     public List<Stock> getAllActiveStocks() {
@@ -217,5 +220,35 @@ public class StockService {
         }
         log.info("인기 종목 프리셋 등록 완료: {}건", registered);
         return registered;
+    }
+
+    @Transactional
+    public int syncSectorsFromDart() {
+        List<Stock> activeStocks = stockRepository.findByActiveTrue();
+        int updated = 0;
+
+        for (Stock stock : activeStocks) {
+            try {
+                DartCompanyDTO company = dartApiClient.getCompanyInfo(stock.getCode());
+                if (company != null && company.getIndustryName() != null
+                        && !company.getIndustryName().isBlank()) {
+                    String newSector = company.getIndustryName();
+                    if (!newSector.equals(stock.getSector())) {
+                        stock.updateInfo(stock.getName(), newSector);
+                        stockRepository.save(stock);
+                        updated++;
+                    }
+                }
+                Thread.sleep(150);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.error("업종 동기화 실패: {} ({}) - {}", stock.getName(), stock.getCode(), e.getMessage());
+            }
+        }
+
+        log.info("DART 업종 동기화 완료: {}건 업데이트 (전체 {}개 중)", updated, activeStocks.size());
+        return updated;
     }
 }

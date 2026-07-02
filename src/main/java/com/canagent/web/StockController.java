@@ -2,6 +2,9 @@ package com.canagent.web;
 
 import com.canagent.domain.stock.Stock;
 import com.canagent.service.StockService;
+import com.canagent.worker.DataSyncScheduler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -16,11 +19,15 @@ import java.util.Map;
 @RequestMapping("/stocks")
 public class StockController {
 
+    private static final Logger log = LoggerFactory.getLogger(StockController.class);
+
     private final StockService stockService;
+    private final DataSyncScheduler dataSyncScheduler;
 
     @Autowired
-    public StockController(StockService stockService) {
+    public StockController(StockService stockService, DataSyncScheduler dataSyncScheduler) {
         this.stockService = stockService;
+        this.dataSyncScheduler = dataSyncScheduler;
     }
 
     @GetMapping
@@ -129,6 +136,45 @@ public class StockController {
                 "totalActive", stockService.getActiveStockCount(),
                 "kospi", stockService.getStockCountByMarket("KOSPI"),
                 "kosdaq", stockService.getStockCountByMarket("KOSDAQ")
+        ));
+    }
+
+    @PostMapping("/sync/bulk-prices")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> bulkPriceSync(
+            @RequestParam(defaultValue = "200") int days) {
+        new Thread(() -> dataSyncScheduler.runBulkPriceSync(days)).start();
+        return ResponseEntity.ok(Map.of(
+                "status", "started",
+                "message", "벌크 주가 동기화가 백그라운드에서 시작되었습니다: " + days + " 거래일"
+        ));
+    }
+
+    @PostMapping("/sync/bulk-financials")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> bulkFinancialSync(
+            @RequestParam(defaultValue = "8") int quarters) {
+        new Thread(() -> dataSyncScheduler.runBulkFinancialSync(quarters)).start();
+        return ResponseEntity.ok(Map.of(
+                "status", "started",
+                "message", "벌크 재무 동기화가 백그라운드에서 시작되었습니다: " + quarters + "분기"
+        ));
+    }
+
+    @PostMapping("/sync/sectors")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> syncSectors() {
+        new Thread(() -> {
+            try {
+                int count = stockService.syncSectorsFromDart();
+                log.info("업종 동기화 완료: {}건 업데이트", count);
+            } catch (Exception e) {
+                log.error("업종 동기화 실패: {}", e.getMessage());
+            }
+        }).start();
+        return ResponseEntity.ok(Map.of(
+                "status", "started",
+                "message", "업종 동기화가 백그라운드에서 시작되었습니다."
         ));
     }
 }

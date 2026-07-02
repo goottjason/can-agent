@@ -46,12 +46,13 @@ trading:
     enabled: true
     cron: "0 0 9 * * MON-FRI"              # 평일 오전 9시 (자동매매)
     sync-cron: "0 30 15 * * MON-FRI"       # 평일 오후 3시 30분 (주가 동기화)
-    quarterly-cron: "0 0 10 1 1,4,7,10 *"  # 분기별 재무제표 동기화
-    price-cron: "0 */5 9-15 * * MON-FRI"   # 장중 5분마다 현재가 갱신
-    close-price-cron: "0 0 16 * * MON-FRI" # 장 마감 후 종가 갱신
+    quarterly-cron: "0 0 10 1,4,7,10 *"    # 분기별 재무제표 동기화
+    monitor-cron: "0 */5 9-15 * * MON-FRI" # 장중 5분마다 실시간 모니터링
   max-positions: 10              # 최대 보유 종목 수
+  position-rate: 10              # 종목당 최대 배분 비율 (%)
   stop-loss-rate: 7              # 손절 기준 (%)
   take-profit-rate: 20           # 익절 기준 (%)
+  min-score: 120                 # 매수 최소 점수 (CANSLIM + 컵앤핸들, 최대 180)
   real-trading: false            # 실제 매매 실행 여부 (true: 실전, false: 시뮬레이션)
   secret: ${TRADE_SECRET:}       # trade/run 엔드포인트 인증 키 (비어있으면 인증 해제)
 

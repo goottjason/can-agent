@@ -150,6 +150,91 @@ public class KrxDataSyncService {
         return totalSaved;
     }
 
+    public int bulkSyncAllActiveStocks(int tradingDays) {
+        log.info("벌크 주가 동기화 시작: 과거 {} 거래일", tradingDays);
+
+        List<Stock> activeStocks = stockRepository.findByActiveTrue();
+        if (activeStocks.isEmpty()) {
+            log.warn("활성 종목 없음");
+            return 0;
+        }
+
+        java.util.Set<String> activeCodes = new java.util.HashSet<>();
+        java.util.Map<String, Stock> codeToStock = new java.util.HashMap<>();
+        for (Stock s : activeStocks) {
+            activeCodes.add(s.getCode());
+            codeToStock.put(s.getCode(), s);
+        }
+
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusDays((long) (tradingDays * 1.6));
+
+        int totalSaved = 0;
+        int apiCalls = 0;
+        LocalDate current = startDate;
+
+        while (!current.isAfter(endDate)) {
+            String dateStr = current.format(DATE_FORMAT);
+            try {
+                List<KrxPriceDTO> allPrices = krxApiClient.getAllDailyPrices(dateStr);
+                apiCalls++;
+
+                int daySaved = 0;
+                for (KrxPriceDTO dto : allPrices) {
+                    String code = dto.getStockCode();
+                    if (!activeCodes.contains(code)) {
+                        continue;
+                    }
+                    Stock stock = codeToStock.get(code);
+                    try {
+                        LocalDate date = LocalDate.parse(dto.getBaseDate(), DATE_FORMAT);
+                        StockPrice saved = savePriceImmediately(stock, date, dto);
+                        if (saved != null) {
+                            totalSaved++;
+                            daySaved++;
+                        }
+                    } catch (Exception e) {
+                        log.error("주가 데이터 저장 실패: {} - {}", code, e.getMessage());
+                    }
+                }
+
+                if (apiCalls % 10 == 0) {
+                    log.info("벌크 동기화 진행 중: {}일 처리, {}건 저장 (이번 날: {}건)", apiCalls, totalSaved, daySaved);
+                }
+            } catch (Exception e) {
+                log.error("날짜 {} 데이터 조회 실패: {}", dateStr, e.getMessage());
+            }
+            current = current.plusDays(1);
+        }
+
+        log.info("벌크 주가 동기화 완료: {}일 처리, {}건 저장 (활성종목 {}개)", apiCalls, totalSaved, activeCodes.size());
+        return totalSaved;
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public StockPrice savePriceImmediately(Stock stock, LocalDate date, KrxPriceDTO dto) {
+        Optional<StockPrice> existing = stockPriceRepository
+                .findByStockIdAndDateBetweenOrderByDateAsc(stock.getId(), date, date)
+                .stream()
+                .findFirst();
+
+        if (existing.isPresent()) {
+            return null;
+        }
+
+        StockPrice stockPrice = new StockPrice(
+                stock,
+                date,
+                parseBigDecimal(dto.getOpeningPrice()),
+                parseBigDecimal(dto.getHighPrice()),
+                parseBigDecimal(dto.getLowPrice()),
+                parseBigDecimal(dto.getClosingPrice()),
+                parseLong(dto.getTradingQuantity())
+        );
+        stockPrice.setChangeRate(parseBigDecimal(dto.getFluctuationRate()));
+        return stockPriceRepository.save(stockPrice);
+    }
+
     private BigDecimal parseBigDecimal(String value) {
         if (value == null || value.isBlank()) {
             return BigDecimal.ZERO;

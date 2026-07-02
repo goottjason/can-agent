@@ -41,31 +41,31 @@ public class KoreaInvestmentPriceResponse {
     }
 
     public static class PriceOutput {
-        @JsonProperty("STCK_PRCC")
+        @JsonProperty("stck_prpr")
         private String currentPrice;
 
-        @JsonProperty("STCK_OPRC")
+        @JsonProperty("stck_oprc")
         private String openingPrice;
 
-        @JsonProperty("STCK_HGPR")
+        @JsonProperty("stck_hgpr")
         private String highPrice;
 
-        @JsonProperty("STCK_LWPR")
+        @JsonProperty("stck_lwpr")
         private String lowPrice;
 
-        @JsonProperty("STCK_PRDY_vLNG")
+        @JsonProperty("stck_prdy_vlng")
         private String previousClose;
 
-        @JsonProperty("PRDY_VRSS")
+        @JsonProperty("prdy_vrss")
         private String changeAmount;
 
-        @JsonProperty("PRDY_VRSS_RATE")
+        @JsonProperty("prdy_vrss_rate")
         private String changeRate;
 
-        @JsonProperty("ACML_VOL")
+        @JsonProperty("acml_vol")
         private String cumulativeVolume;
 
-        @JsonProperty("ACML_TR_PBMN")
+        @JsonProperty("acml_tr_pbmn")
         private String cumulativeTradingAmount;
 
         public String getCurrentPrice() { return currentPrice; }

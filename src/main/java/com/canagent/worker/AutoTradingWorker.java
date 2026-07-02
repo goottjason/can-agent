@@ -42,7 +42,7 @@ public class AutoTradingWorker {
         this.notificationServiceRouter = notificationServiceRouter;
     }
 
-    @Scheduled(cron = "${trading.scheduler.cron:0 0 9 * * MON-FRI}")
+    @Scheduled(cron = "${trading.scheduler.cron:0 0 9 * * MON-FRI}", zone = "Asia/Seoul")
     public void executeTrading() {
         log.info("===== 자동매매 워커 시작 =====");
 

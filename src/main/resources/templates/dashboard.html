@@ -61,6 +61,52 @@
             </div>
         </div>
 
+        <section class="monitor-section" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+            <h2>실시간 모니터링</h2>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div class="stat-item">
+                    <span class="label">상태</span>
+                    <span class="value" th:text="${monitorActive} ? '가동 중' : '대기 중'" th:style="${monitorActive} ? 'color: #28a745' : 'color: #6c757d'">대기 중</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">마지막 검사</span>
+                    <span class="value" th:text="${monitorLastCheck} ? ${#temporals.format(monitorLastCheck, 'HH:mm:ss')} : '-'">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">매수 신호</span>
+                    <span class="value" th:text="${monitorSignalCount} + '건'">0건</span>
+                </div>
+            </div>
+            <div th:if="${!#lists.isEmpty(monitorSignals)}" style="margin-top: 15px;">
+                <h3>매수 신호 발생 종목</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>종목</th>
+                            <th>현재가</th>
+                            <th>CANSLIM 점수</th>
+                            <th>컵앤핸들 점수</th>
+                            <th>총점</th>
+                            <th>사유</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="signal : ${monitorSignals}">
+                            <td>
+                                <span th:text="${signal.name}">종목명</span>
+                                <span th:text="'(' + ${signal.code} + ')'">(000000)</span>
+                            </td>
+                            <td th:text="${#numbers.formatInteger(signal.price, 1, 'COMMA')} + '원'">0원</td>
+                            <td th:text="${signal.canSlimScore}">0</td>
+                            <td th:text="${signal.cupScore}">0</td>
+                            <td th:text="${signal.totalScore}" style="font-weight: bold;">0</td>
+                            <td th:text="${signal.reason}" style="font-size: 0.85rem;">사유</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="summary">
             <div class="summary-card">
                 <h3>투자 금액</h3>

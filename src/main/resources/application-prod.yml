@@ -46,11 +46,12 @@ trading:
     cron: "0 0 9 * * MON-FRI"
     sync-cron: "0 30 15 * * MON-FRI"
     quarterly-cron: "0 0 10 1,4,7,10 * *"
-    price-cron: "0 */5 9-15 * * MON-FRI"
-    close-price-cron: "0 0 16 * * MON-FRI"
+    monitor-cron: "0 */5 9-15 * * MON-FRI"
   max-positions: 10
+  position-rate: 10
   stop-loss-rate: 7
   take-profit-rate: 20
+  min-score: 120
   real-trading: ${REAL_TRADING:true}
   secret: ${TRADE_SECRET:}
 

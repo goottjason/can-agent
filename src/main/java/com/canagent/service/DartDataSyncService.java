@@ -145,7 +145,6 @@ public class DartDataSyncService {
         return 1;
     }
 
-    @Transactional
     public int syncAllActiveStocks(String year, String quarter) {
         List<Stock> activeStocks = stockRepository.findByActiveTrue();
         int syncCount = 0;
@@ -165,6 +164,56 @@ public class DartDataSyncService {
 
         log.info("전체 재무제표 동기화 완료: {}건 저장 ({}년 {}분기)", syncCount, year, quarter);
         return syncCount;
+    }
+
+    public int bulkSyncAllActiveStocks(int quarters) {
+        log.info("벌크 재무제표 동기화 시작: 과거 {}분기", quarters);
+
+        List<Stock> activeStocks = stockRepository.findByActiveTrue();
+        if (activeStocks.isEmpty()) {
+            log.warn("활성 종목 없음");
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now();
+        int currentYear = today.getYear();
+        int currentQuarter = (today.getMonthValue() - 1) / 3 + 1;
+
+        int totalCount = 0;
+
+        for (int i = 0; i < quarters; i++) {
+            int q = currentQuarter - i;
+            int y = currentYear;
+            while (q <= 0) {
+                q += 4;
+                y--;
+            }
+
+            String year = String.valueOf(y);
+            String quarter = String.valueOf(q);
+
+            log.info("재무제표 동기화: {}년 {}분기", year, quarter);
+
+            for (Stock stock : activeStocks) {
+                try {
+                    int result = syncFinancialStatements(stock.getCode(), year, quarter);
+                    totalCount += result;
+                    Thread.sleep(150);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.info("벌크 재무 동기화 중단");
+                    return totalCount;
+                } catch (Exception e) {
+                    log.error("재무제표 동기화 실패: {} ({}) - {}년 {}분기 - {}",
+                            stock.getName(), stock.getCode(), year, quarter, e.getMessage());
+                }
+            }
+
+            log.info("{}년 {}분기 동기화 완료", year, quarter);
+        }
+
+        log.info("벌크 재무제표 동기화 완료: {}건 저장", totalCount);
+        return totalCount;
     }
 
     private BigDecimal extractValue(List<DartFinancialDTO> financials, String accountName) {

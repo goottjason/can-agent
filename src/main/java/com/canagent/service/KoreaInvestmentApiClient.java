@@ -132,8 +132,8 @@ public class KoreaInvestmentApiClient {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
 
         String url = UriComponentsBuilder.fromHttpUrl(config.getBaseUrl() + PRICE_PATH)
-                .queryParam("FID_COND_MKT_DIV_CODE", "J")
-                .queryParam("FID_ISCD", stockCode)
+                .queryParam("FID_COND_MRKT_DIV_CODE", "J")
+                .queryParam("FID_INPUT_ISCD", stockCode)
                 .toUriString();
 
         HttpHeaders headers = createHeaders(PRICE_TR_ID);
@@ -147,7 +147,11 @@ public class KoreaInvestmentApiClient {
                 return response.getBody();
             }
 
-            log.error("현재가 조회 실패: {}", response.getBody());
+            log.error("현재가 조회 실패: rt_cd={}, msg_cd={}, msg1={}, stockCode={}",
+                    response.getBody() != null ? response.getBody().getRtCd() : "null",
+                    response.getBody() != null ? response.getBody().getMsgCd() : "null",
+                    response.getBody() != null ? response.getBody().getMsg1() : "null",
+                    stockCode);
             return response.getBody();
         } catch (Exception e) {
             log.error("현재가 조회 API 호출 실패: {}", e.getMessage());

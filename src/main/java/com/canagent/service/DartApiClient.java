@@ -2,6 +2,7 @@ package com.canagent.service;
 
 import com.canagent.config.ApiConfig;
 import com.canagent.service.dto.DartApiResponse;
+import com.canagent.service.dto.DartCompanyDTO;
 import com.canagent.service.dto.DartFinancialDTO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,8 +66,10 @@ public class DartApiClient {
                 + "&fs_div=CFS";
 
         try {
-            DartApiResponse<DartFinancialDTO> response = restTemplate.getForObject(
-                    url, DartApiResponse.class);
+            String json = restTemplate.getForObject(url, String.class);
+            ObjectMapper mapper = new ObjectMapper();
+            DartApiResponse<DartFinancialDTO> response = mapper.readValue(
+                    json, new com.fasterxml.jackson.core.type.TypeReference<DartApiResponse<DartFinancialDTO>>() {});
 
             if (response != null && response.isSuccess()) {
                 return response.getList();
@@ -77,6 +80,28 @@ public class DartApiClient {
         }
 
         return Collections.emptyList();
+    }
+
+    public DartCompanyDTO getCompanyInfo(String stockCode) {
+        String corpCode = getCorpCode(stockCode);
+        if (corpCode == null) {
+            return null;
+        }
+
+        String url = "https://opendart.fss.or.kr/api/company.json"
+                + "?crtfc_key=" + apiConfig.getDart().getKey()
+                + "&corp_code=" + corpCode;
+
+        try {
+            DartCompanyDTO response = restTemplate.getForObject(url, DartCompanyDTO.class);
+            if (response != null && "000".equals(response.getStatus())) {
+                return response;
+            }
+        } catch (Exception e) {
+            log.error("DART 기업정보 조회 실패: {} - {}", stockCode, e.getMessage());
+        }
+
+        return null;
     }
 
     private String getReportCode(String quarter) {

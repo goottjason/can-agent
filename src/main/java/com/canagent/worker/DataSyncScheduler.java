@@ -26,7 +26,7 @@ public class DataSyncScheduler {
         this.dartDataSyncService = dartDataSyncService;
     }
 
-    @Scheduled(cron = "${trading.scheduler.sync-cron:0 30 15 * * MON-FRI}")
+    @Scheduled(cron = "${trading.scheduler.sync-cron:0 30 15 * * MON-FRI}", zone = "Asia/Seoul")
     public void syncDailyData() {
         log.info("===== 일일 데이터 동기화 시작 =====");
 
@@ -49,7 +49,7 @@ public class DataSyncScheduler {
         log.info("===== 일일 데이터 동기화 종료 =====");
     }
 
-    @Scheduled(cron = "${trading.scheduler.quarterly-cron:0 0 10 1 1,4,7,10 *}")
+    @Scheduled(cron = "${trading.scheduler.quarterly-cron:0 0 10 1 1,4,7,10 *}", zone = "Asia/Seoul")
     public void syncQuarterlyFinancials() {
         log.info("===== 분기 재무제표 동기화 시작 =====");
 
@@ -71,6 +71,26 @@ public class DataSyncScheduler {
         log.info("수동 데이터 동기화 시작");
         syncDailyData();
         log.info("수동 데이터 동기화 완료");
+    }
+
+    public void runBulkPriceSync(int tradingDays) {
+        log.info("벌크 주가 동기화 시작: {} 거래일", tradingDays);
+        try {
+            int count = krxDataSyncService.bulkSyncAllActiveStocks(tradingDays);
+            log.info("벌크 주가 동기화 완료: {}건 저장", count);
+        } catch (Exception e) {
+            log.error("벌크 주가 동기화 실패: {}", e.getMessage());
+        }
+    }
+
+    public void runBulkFinancialSync(int quarters) {
+        log.info("벌크 재무 동기화 시작: {}분기", quarters);
+        try {
+            int count = dartDataSyncService.bulkSyncAllActiveStocks(quarters);
+            log.info("벌크 재무 동기화 완료: {}건 저장", count);
+        } catch (Exception e) {
+            log.error("벌크 재무 동기화 실패: {}", e.getMessage());
+        }
     }
 
     private boolean isWeekend(LocalDate date) {
