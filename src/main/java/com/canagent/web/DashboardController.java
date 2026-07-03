@@ -144,9 +144,8 @@ public class DashboardController {
     @PostMapping("/trade/run")
     public String runManualCheck(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         if (autoTradingWorker != null) {
-            long activeCount = portfolioService.getActivePortfolios().size();
-            autoTradingWorker.runManualCheck();
-            redirectAttributes.addFlashAttribute("tradeResult", "수동 검사 완료");
+            autoTradingWorker.runManualAnalysis();
+            redirectAttributes.addFlashAttribute("tradeResult", "수동 분석 완료 (점수 저장)");
         }
         return "redirect:/";
     }

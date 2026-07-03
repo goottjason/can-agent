@@ -1,8 +1,10 @@
 package com.canagent.worker;
 
+import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.stock.StockPrice;
 import com.canagent.domain.trading.Trade;
+import com.canagent.repository.AnalysisScoreRepository;
 import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
@@ -42,6 +44,7 @@ public class IntradayMonitorWorker {
     private final StockRepository stockRepository;
     private final StockPriceRepository stockPriceRepository;
     private final PortfolioRepository portfolioRepository;
+    private final AnalysisScoreRepository analysisScoreRepository;
     private final KoreaInvestmentApiClient koreaInvestmentApiClient;
     private final CanSlimAnalysisService canSlimAnalysisService;
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
@@ -54,7 +57,7 @@ public class IntradayMonitorWorker {
     @Value("${trading.position-rate:10}")
     private int positionRate;
 
-    @Value("${trading.min-score:60}")
+    @Value("${trading.min-score:120}")
     private int minScore;
 
     private volatile boolean monitoring = false;
@@ -66,6 +69,7 @@ public class IntradayMonitorWorker {
             StockRepository stockRepository,
             StockPriceRepository stockPriceRepository,
             PortfolioRepository portfolioRepository,
+            AnalysisScoreRepository analysisScoreRepository,
             KoreaInvestmentApiClient koreaInvestmentApiClient,
             CanSlimAnalysisService canSlimAnalysisService,
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
@@ -74,6 +78,7 @@ public class IntradayMonitorWorker {
         this.stockRepository = stockRepository;
         this.stockPriceRepository = stockPriceRepository;
         this.portfolioRepository = portfolioRepository;
+        this.analysisScoreRepository = analysisScoreRepository;
         this.koreaInvestmentApiClient = koreaInvestmentApiClient;
         this.canSlimAnalysisService = canSlimAnalysisService;
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
@@ -94,12 +99,16 @@ public class IntradayMonitorWorker {
         lastCheckTime = now;
 
         try {
-            List<Stock> activeStocks = stockRepository.findByActiveTrue();
-            log.info("대상 종목 수: {}", activeStocks.size());
+            // 1단계: 보유 종목 매도 체크 (≤10개, ~5초)
+            checkHeldPositionsForSell(now);
+
+            // 2단계: 매수 대상 스캔 (~400종목)
+            List<Stock> targetStocks = getTargetStocks();
+            log.info("대상 종목 수: {}", targetStocks.size());
 
             List<SignalStock> signalStocks = new ArrayList<>();
 
-            for (Stock stock : activeStocks) {
+            for (Stock stock : targetStocks) {
                 try {
                     processStockForSignal(stock, signalStocks);
                     Thread.sleep(500);
@@ -111,8 +120,12 @@ public class IntradayMonitorWorker {
                 }
             }
 
-            if (!signalStocks.isEmpty()) {
+            // 3단계: 매수 주문 실행
+            LocalDateTime checkTime = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+            if (!signalStocks.isEmpty() && isTradingHours(checkTime)) {
                 executeBuyOrders(signalStocks);
+            } else if (!signalStocks.isEmpty()) {
+                log.info("장 마감으로 매수 건너뜀: {}건", signalStocks.size());
             }
 
             lastSignalCount = signalStocks.size();
@@ -134,6 +147,107 @@ public class IntradayMonitorWorker {
         } finally {
             monitoring = false;
         }
+    }
+
+    // ========== 1단계: 보유 종목 매도 체크 ==========
+
+    private void checkHeldPositionsForSell(LocalDateTime now) {
+        List<Portfolio> heldPositions = portfolioRepository.findByActiveTrue();
+        if (heldPositions.isEmpty()) {
+            return;
+        }
+
+        log.info("보유 종목 매도 체크: {}건", heldPositions.size());
+        LocalDate today = now.toLocalDate();
+
+        for (Portfolio portfolio : heldPositions) {
+            try {
+                Stock stock = portfolio.getStock();
+                KoreaInvestmentPriceResponse priceResponse = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
+
+                if (priceResponse == null || !priceResponse.isSuccess()) {
+                    continue;
+                }
+
+                int currentPriceInt = priceResponse.getCurrentPrice();
+                if (currentPriceInt <= 0) {
+                    continue;
+                }
+
+                BigDecimal currentPrice = new BigDecimal(currentPriceInt);
+                saveCurrentPrice(stock, currentPrice, priceResponse);
+
+                BigDecimal profitRate = currentPrice.subtract(portfolio.getAverageBuyPrice())
+                        .divide(portfolio.getAverageBuyPrice(), 4, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100"));
+
+                // 손절: -7% 이하
+                if (profitRate.compareTo(new BigDecimal("-7")) <= 0) {
+                    log.info("[손절] {} ({}) 수익률: {}% - 매도 실행", stock.getName(), stock.getCode(), profitRate);
+                    Trade trade = tradingStrategyService.executeSell(stock, portfolio.getQuantity(), currentPrice,
+                            String.format("장중 손절 (-%.1f%%)", profitRate.negate()));
+                    if (trade != null) {
+                        notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+                    }
+                    continue;
+                }
+
+                // 익절: +20% 이상
+                if (profitRate.compareTo(new BigDecimal("20")) >= 0) {
+                    log.info("[익절] {} ({}) 수익률: {}% - 매도 실행", stock.getName(), stock.getCode(), profitRate);
+                    Trade trade = tradingStrategyService.executeSell(stock, portfolio.getQuantity(), currentPrice,
+                            String.format("장중 익절 (+%.1f%%)", profitRate));
+                    if (trade != null) {
+                        notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+                    }
+                    continue;
+                }
+
+                // 점수 하락: DB 최신 can_slim_score < 40
+                analysisScoreRepository.findByStockIdAndAnalysisDate(stock.getId(), today)
+                        .ifPresent(score -> {
+                            if (score.getCanSlimScore() < 40) {
+                                log.info("[점수하락] {} ({}) CANSLIM 점수: {} - 매도 실행",
+                                        stock.getName(), stock.getCode(), score.getCanSlimScore());
+                                try {
+                                    Trade trade = tradingStrategyService.executeSell(stock, portfolio.getQuantity(), currentPrice,
+                                            String.format("장중 CANSLIM 점수 하락: %d", score.getCanSlimScore()));
+                                    if (trade != null) {
+                                        notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+                                    }
+                                } catch (Exception e) {
+                                    log.error("매도 실행 실패: {} ({}) - {}", stock.getName(), stock.getCode(), e.getMessage());
+                                }
+                            }
+                        });
+
+                Thread.sleep(500);
+            } catch (Exception e) {
+                log.error("보유 종목 매도 체크 실패: {} - {}", portfolio.getStock().getName(), e.getMessage());
+            }
+        }
+    }
+
+    // ========== 2단계: 매수 대상 스캔 ==========
+
+    private List<Stock> getTargetStocks() {
+        LocalDate yesterday = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(1);
+
+        List<StockPrice> topVolume = stockPriceRepository.findTopByVolumeOnDate(yesterday, 200);
+        List<StockPrice> topChange = stockPriceRepository.findTopByChangeRateOnDate(yesterday, 200);
+
+        Map<Long, Stock> stockMap = new LinkedHashMap<>();
+        for (StockPrice sp : topVolume) {
+            stockMap.putIfAbsent(sp.getStock().getId(), sp.getStock());
+        }
+        for (StockPrice sp : topChange) {
+            stockMap.putIfAbsent(sp.getStock().getId(), sp.getStock());
+        }
+
+        List<Stock> result = new ArrayList<>(stockMap.values());
+        log.info("필터링된 대상 종목: 거래량 상위 {} + 변동률 상위 {} = 중복 제거 후 {}개",
+                topVolume.size(), topChange.size(), result.size());
+        return result;
     }
 
     private boolean isTradingHours(LocalDateTime utcNow) {
@@ -166,7 +280,8 @@ public class IntradayMonitorWorker {
 
         saveCurrentPrice(stock, currentPrice, priceResponse);
 
-        Optional<com.canagent.domain.portfolio.Portfolio> existingPosition =
+        // 보유 종목이면 매수 스킵
+        Optional<Portfolio> existingPosition =
                 portfolioRepository.findByStockIdAndActiveTrue(stock.getId());
         if (existingPosition.isPresent()) {
             return;
@@ -174,6 +289,24 @@ public class IntradayMonitorWorker {
 
         CanSlimResult canSlimResult = canSlimAnalysisService.analyze(stock);
         CupAndHandleResult cupResult = cupAndHandleAnalyzer.analyze(stock);
+
+        // 점수를 DB에 UPSERT (당일 기준)
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        analysisScoreRepository.upsertScore(
+                stock.getId(),
+                today,
+                "INTRADAY_MONITOR",
+                canSlimResult.totalScore().intValue(),
+                canSlimResult.currentQuarterEarnings() != null ? canSlimResult.currentQuarterEarnings().score().intValue() : 0,
+                canSlimResult.annualEarnings() != null ? canSlimResult.annualEarnings().score().intValue() : 0,
+                canSlimResult.supplyDemand() != null ? canSlimResult.supplyDemand().score().intValue() : 0,
+                canSlimResult.marketDirection() != null ? canSlimResult.marketDirection().score().intValue() : 0,
+                canSlimResult.marketPosition() != null ? canSlimResult.marketPosition().score().intValue() : 0,
+                0,
+                cupResult.score() != null ? cupResult.score().intValue() : 0,
+                cupResult.patternType() != null ? cupResult.patternType().name() : "NO_PATTERN",
+                canSlimResult.totalScore().add(cupResult.score() != null ? cupResult.score() : BigDecimal.ZERO).intValue()
+        );
 
         boolean canSlimBuy = canSlimResult.isBuySignal();
         boolean cupBuy = cupResult.isBuySignal();
@@ -225,6 +358,8 @@ public class IntradayMonitorWorker {
         }
         return sb.toString();
     }
+
+    // ========== 3단계: 매수 주문 실행 ==========
 
     private void executeBuyOrders(List<SignalStock> signalStocks) {
         long activePositions = portfolioRepository.findByActiveTrue().size();

@@ -1,14 +1,12 @@
 package com.canagent.worker;
 
 import com.canagent.domain.stock.Stock;
-import com.canagent.domain.stock.StockPrice;
-import com.canagent.domain.trading.Trade;
-import com.canagent.repository.StockPriceRepository;
+import com.canagent.repository.AnalysisScoreRepository;
 import com.canagent.repository.StockRepository;
-import com.canagent.service.TradingStrategyService;
-import com.canagent.service.TradingStrategyService.TradingDecision;
-import com.canagent.service.notification.NotificationEvent;
-import com.canagent.service.notification.NotificationServiceRouter;
+import com.canagent.service.analysis.CanSlimAnalysisService;
+import com.canagent.service.analysis.CupAndHandleAnalyzer;
+import com.canagent.service.dto.CanSlimResult;
+import com.canagent.service.dto.CupAndHandleResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,8 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
 
 @Component
 @ConditionalOnProperty(name = "trading.scheduler.enabled", havingValue = "true")
@@ -27,93 +23,72 @@ public class AutoTradingWorker {
     private static final Logger log = LoggerFactory.getLogger(AutoTradingWorker.class);
 
     private final StockRepository stockRepository;
-    private final StockPriceRepository stockPriceRepository;
-    private final TradingStrategyService tradingStrategyService;
-    private final NotificationServiceRouter notificationServiceRouter;
+    private final AnalysisScoreRepository analysisScoreRepository;
+    private final CanSlimAnalysisService canSlimAnalysisService;
+    private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
 
     public AutoTradingWorker(
             StockRepository stockRepository,
-            StockPriceRepository stockPriceRepository,
-            TradingStrategyService tradingStrategyService,
-            NotificationServiceRouter notificationServiceRouter) {
+            AnalysisScoreRepository analysisScoreRepository,
+            CanSlimAnalysisService canSlimAnalysisService,
+            CupAndHandleAnalyzer cupAndHandleAnalyzer) {
         this.stockRepository = stockRepository;
-        this.stockPriceRepository = stockPriceRepository;
-        this.tradingStrategyService = tradingStrategyService;
-        this.notificationServiceRouter = notificationServiceRouter;
+        this.analysisScoreRepository = analysisScoreRepository;
+        this.canSlimAnalysisService = canSlimAnalysisService;
+        this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
     }
 
-    @Scheduled(cron = "${trading.scheduler.cron:0 0 9 * * MON-FRI}", zone = "Asia/Seoul")
-    public void executeTrading() {
-        log.info("===== 자동매매 워커 시작 =====");
+    @Scheduled(cron = "${trading.scheduler.cron:0 0 19 * * MON-FRI}", zone = "Asia/Seoul")
+    public void executeAnalysis() {
+        log.info("===== 점수 저장 워커 시작 (전 종목 분석) =====");
 
-        List<Stock> activeStocks = stockRepository.findByActiveTrue();
-        log.info("대상 종목 수: {}", activeStocks.size());
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        int savedCount = 0;
 
-        for (Stock stock : activeStocks) {
-            try {
-                processStock(stock);
-            } catch (Exception e) {
-                log.error("종목 처리 실패: {} ({}) - {}",
-                        stock.getName(), stock.getCode(), e.getMessage());
+        try {
+            var activeStocks = stockRepository.findByActiveTrue();
+            log.info("대상 종목 수: {}", activeStocks.size());
+
+            for (Stock stock : activeStocks) {
+                try {
+                    analyzeAndSave(stock, today);
+                    savedCount++;
+                } catch (Exception e) {
+                    log.error("종목 분석 실패: {} ({}) - {}",
+                            stock.getName(), stock.getCode(), e.getMessage());
+                }
             }
+        } catch (Exception e) {
+            log.error("점수 저장 워커 실패: {}", e.getMessage());
         }
 
-        log.info("===== 자동매매 워커 종료 =====");
+        log.info("===== 점수 저장 워커 종료: {}종목 분석 완료 =====", savedCount);
     }
 
-    private void processStock(Stock stock) {
-        Optional<StockPrice> latestPriceOpt = stockPriceRepository
-                .findTopByStockIdOrderByDateDesc(stock.getId());
+    private void analyzeAndSave(Stock stock, LocalDate today) {
+        CanSlimResult canSlimResult = canSlimAnalysisService.analyze(stock);
+        CupAndHandleResult cupResult = cupAndHandleAnalyzer.analyze(stock);
 
-        if (latestPriceOpt.isEmpty()) {
-            log.info("가격 데이터 없음: {} ({}) id={}", stock.getName(), stock.getCode(), stock.getId());
-            return;
-        }
-
-        StockPrice latestPrice = latestPriceOpt.get();
-        BigDecimal currentPrice = latestPrice.getClose();
-        log.info("종목 분석: {} ({}) 가격={}", stock.getName(), stock.getCode(), currentPrice);
-
-        if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) == 0) {
-            log.info("유효하지 않은 가격: {} ({})", stock.getName(), stock.getCode());
-            return;
-        }
-
-        TradingDecision sellDecision = tradingStrategyService.evaluateSell(stock, currentPrice);
-        if (sellDecision.shouldSell()) {
-            Trade trade = tradingStrategyService.executeSell(
-                    stock,
-                    sellDecision.quantity(),
-                    currentPrice,
-                    sellDecision.reason()
-            );
-            if (trade != null) {
-                log.info("매도 실행: {} {}주 @ {}원 - {}",
-                        stock.getName(), sellDecision.quantity(), currentPrice, sellDecision.reason());
-                notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
-            }
-            return;
-        }
-
-        TradingDecision buyDecision = tradingStrategyService.evaluateBuy(stock, currentPrice);
-        if (buyDecision.shouldBuy()) {
-            Trade trade = tradingStrategyService.executeBuy(
-                    stock,
-                    buyDecision.quantity(),
-                    currentPrice,
-                    buyDecision.reason()
-            );
-            if (trade != null) {
-                log.info("매수 실행: {} {}주 @ {}원 - {}",
-                        stock.getName(), buyDecision.quantity(), currentPrice, buyDecision.reason());
-                notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
-            }
-        }
+        analysisScoreRepository.upsertScore(
+                stock.getId(),
+                today,
+                "AUTO_TRADING",
+                canSlimResult.totalScore().intValue(),
+                canSlimResult.currentQuarterEarnings() != null ? canSlimResult.currentQuarterEarnings().score().intValue() : 0,
+                canSlimResult.annualEarnings() != null ? canSlimResult.annualEarnings().score().intValue() : 0,
+                canSlimResult.supplyDemand() != null ? canSlimResult.supplyDemand().score().intValue() : 0,
+                canSlimResult.marketDirection() != null ? canSlimResult.marketDirection().score().intValue() : 0,
+                canSlimResult.marketPosition() != null ? canSlimResult.marketPosition().score().intValue() : 0,
+                0,
+                cupResult.score() != null ? cupResult.score().intValue() : 0,
+                cupResult.patternType() != null ? cupResult.patternType().name() : "NO_PATTERN",
+                canSlimResult.totalScore().add(cupResult.score() != null ? cupResult.score() : BigDecimal.ZERO).intValue()
+        );
     }
 
-    public void runManualCheck() {
-        log.info("수동 검사 시작");
-        executeTrading();
-        log.info("수동 검사 완료");
+    public void runManualAnalysis() {
+        log.info("수동 점수 저장 시작");
+        executeAnalysis();
+        log.info("수동 점수 저장 완료");
     }
 }

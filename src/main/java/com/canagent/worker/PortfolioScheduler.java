@@ -29,7 +29,7 @@ public class PortfolioScheduler {
         this.koreaInvestmentApiClient = koreaInvestmentApiClient;
     }
 
-    @Scheduled(cron = "${trading.scheduler.price-cron:0 */5 9-15 * * MON-FRI}")
+    @Scheduled(cron = "${trading.scheduler.price-cron:0 */5 9-15 * * MON-FRI}", zone = "Asia/Seoul")
     @Transactional
     public void updatePortfolioPrices() {
         log.debug("포트폴리오 현재가 갱신 시작");
@@ -62,7 +62,7 @@ public class PortfolioScheduler {
         log.debug("포트폴리오 현재가 갱신 완료: {}건 갱신", updatedCount);
     }
 
-    @Scheduled(cron = "${trading.scheduler.close-price-cron:0 0 16 * * MON-FRI}")
+    @Scheduled(cron = "${trading.scheduler.close-price-cron:0 0 16 * * MON-FRI}", zone = "Asia/Seoul")
     @Transactional
     public void updateClosePrices() {
         log.info("장 마감 후 포트폴리오 종가 갱신 시작");
