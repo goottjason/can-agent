@@ -6,10 +6,6 @@
     <title>CAN Agent - 종목 관리</title>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <style>
-        .nav { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .nav a { text-decoration: none; color: #666; padding: 8px 16px; border-radius: 5px; transition: all 0.2s; }
-        .nav a:hover { background: #f0f0f0; }
-        .nav a.active { background: #3498db; color: white; }
         .search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
         .search-bar input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
         .search-bar select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
@@ -49,108 +45,109 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <nav class="nav">
-            <a th:href="@{/}">대시보드</a>
-            <a th:href="@{/stocks}" class="active">종목 관리</a>
-        </nav>
+    <div class="layout">
+        <aside class="sidebar" th:replace="~{fragments/_sidebar :: sidebar}"></aside>
 
-        <header>
-            <h1>종목 관리</h1>
-            <p class="subtitle">KRX 상장종목 검색, 등록, 관리</p>
-        </header>
+        <div class="main-content">
+            <div class="container">
+                <header>
+                    <h1>종목 관리</h1>
+                    <p class="subtitle">KRX 상장종목 검색, 등록, 관리</p>
+                </header>
 
-        <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
-        <div th:if="${errorMessage}" class="alert alert-error" th:text="${errorMessage}"></div>
+                <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
+                <div th:if="${errorMessage}" class="alert alert-error" th:text="${errorMessage}"></div>
 
-        <div class="stats-row">
-            <div class="stat-card">
-                <h4>전체 활성 종목</h4>
-                <div class="number" th:text="${totalActiveCount}">0</div>
-            </div>
-            <div class="stat-card">
-                <h4>KOSPI</h4>
-                <div class="number" th:text="${kospiCount}">0</div>
-            </div>
-            <div class="stat-card">
-                <h4>KOSDAQ</h4>
-                <div class="number" th:text="${kosdaqCount}">0</div>
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <h4>전체 활성 종목</h4>
+                        <div class="number" th:text="${totalActiveCount}">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>KOSPI</h4>
+                        <div class="number" th:text="${kospiCount}">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>KOSDAQ</h4>
+                        <div class="number" th:text="${kosdaqCount}">0</div>
+                    </div>
+                </div>
+
+                <div class="search-bar">
+                    <form th:action="@{/stocks}" method="get" style="display: flex; gap: 10px; flex: 1;">
+                        <input type="text" name="keyword" th:value="${keyword}" placeholder="종목명 또는 코드 검색...">
+                        <select name="market">
+                            <option value="">전체 시장</option>
+                            <option value="KOSPI" th:selected="${market == 'KOSPI'}">KOSPI</option>
+                            <option value="KOSDAQ" th:selected="${market == 'KOSDAQ'}">KOSDAQ</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary">검색</button>
+                    </form>
+                </div>
+
+                <div class="action-bar">
+                    <button class="btn btn-success" onclick="openRegisterModal()">+ 종목 등록</button>
+                    <form th:action="@{/stocks/preset}" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-success">인기 종목 20개 등록</button>
+                    </form>
+                    <form th:action="@{/stocks/sync}" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-primary">KRX 동기화</button>
+                    </form>
+                </div>
+
+                <section>
+                    <div th:if="${#lists.isEmpty(stocks)}" class="empty-state">
+                        등록된 종목이 없습니다. KRX 동기화 또는 수동 등록을 이용해주세요.
+                    </div>
+                    <table th:unless="${#lists.isEmpty(stocks)}">
+                        <thead>
+                            <tr>
+                                <th>코드</th>
+                                <th>종목명</th>
+                                <th>시장</th>
+                                <th>상태</th>
+                                <th>작업</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="stock : ${stocks}">
+                                <td>
+                                    <a th:href="@{/stocks/{id}(id=${stock.id})}" th:text="${stock.code}" style="color: #3498db; text-decoration: none;"></a>
+                                </td>
+                                <td>
+                                    <a th:href="@{/stocks/{id}(id=${stock.id})}" th:text="${stock.name}" style="color: #333; text-decoration: none; font-weight: 500;"></a>
+                                </td>
+                                <td>
+                                    <span class="market-tag"
+                                          th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
+                                          th:text="${stock.market}">KOSPI</span>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
+                                          th:text="${stock.active} ? '활성' : '비활성'">활성</span>
+                                </td>
+                                <td>
+                                    <div th:if="${stock.active}">
+                                        <form th:action="@{/stocks/{id}/deactivate(id=${stock.id})}" method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-danger btn-sm">비활성화</button>
+                                        </form>
+                                    </div>
+                                    <div th:unless="${stock.active}">
+                                        <form th:action="@{/stocks/{id}/activate(id=${stock.id})}" method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-success btn-sm">활성화</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <footer>
+                    <p>CAN Agent v0.1.0 - William O'Neil 전략 기반 자동매매 시스템</p>
+                </footer>
             </div>
         </div>
-
-        <div class="search-bar">
-            <form th:action="@{/stocks}" method="get" style="display: flex; gap: 10px; flex: 1;">
-                <input type="text" name="keyword" th:value="${keyword}" placeholder="종목명 또는 코드 검색...">
-                <select name="market">
-                    <option value="">전체 시장</option>
-                    <option value="KOSPI" th:selected="${market == 'KOSPI'}">KOSPI</option>
-                    <option value="KOSDAQ" th:selected="${market == 'KOSDAQ'}">KOSDAQ</option>
-                </select>
-                <button type="submit" class="btn btn-primary">검색</button>
-            </form>
-        </div>
-
-        <div class="action-bar">
-            <button class="btn btn-success" onclick="openRegisterModal()">+ 종목 등록</button>
-            <form th:action="@{/stocks/preset}" method="post" style="display: inline;">
-                <button type="submit" class="btn btn-success">인기 종목 20개 등록</button>
-            </form>
-            <form th:action="@{/stocks/sync}" method="post" style="display: inline;">
-                <button type="submit" class="btn btn-primary">KRX 동기화</button>
-            </form>
-        </div>
-
-        <section>
-            <div th:if="${#lists.isEmpty(stocks)}" class="empty-state">
-                등록된 종목이 없습니다. KRX 동기화 또는 수동 등록을 이용해주세요.
-            </div>
-            <table th:unless="${#lists.isEmpty(stocks)}">
-                <thead>
-                    <tr>
-                        <th>코드</th>
-                        <th>종목명</th>
-                        <th>시장</th>
-                        <th>상태</th>
-                        <th>작업</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="stock : ${stocks}">
-                        <td>
-                            <a th:href="@{/stocks/{id}(id=${stock.id})}" th:text="${stock.code}" style="color: #3498db; text-decoration: none;"></a>
-                        </td>
-                        <td>
-                            <a th:href="@{/stocks/{id}(id=${stock.id})}" th:text="${stock.name}" style="color: #333; text-decoration: none; font-weight: 500;"></a>
-                        </td>
-                        <td>
-                            <span class="market-tag"
-                                  th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
-                                  th:text="${stock.market}">KOSPI</span>
-                        </td>
-                        <td>
-                            <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
-                                  th:text="${stock.active} ? '활성' : '비활성'">활성</span>
-                        </td>
-                        <td>
-                            <div th:if="${stock.active}">
-                                <form th:action="@{/stocks/{id}/deactivate(id=${stock.id})}" method="post" style="display: inline;">
-                                    <button type="submit" class="btn btn-danger btn-sm">비활성화</button>
-                                </form>
-                            </div>
-                            <div th:unless="${stock.active}">
-                                <form th:action="@{/stocks/{id}/activate(id=${stock.id})}" method="post" style="display: inline;">
-                                    <button type="submit" class="btn btn-success btn-sm">활성화</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <footer>
-            <p>CAN Agent v0.1.0 - William O'Neil 전략 기반 자동매매 시스템</p>
-        </footer>
     </div>
 
     <div id="registerModal" class="modal">

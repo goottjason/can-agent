@@ -50,6 +50,7 @@ public class StockController {
         model.addAttribute("totalActiveCount", stockService.getActiveStockCount());
         model.addAttribute("kospiCount", stockService.getStockCountByMarket("KOSPI"));
         model.addAttribute("kosdaqCount", stockService.getStockCountByMarket("KOSDAQ"));
+        model.addAttribute("activeMenu", "stocks");
 
         return "stock-list";
     }
@@ -59,6 +60,7 @@ public class StockController {
         Stock stock = stockService.getStockById(id)
                 .orElseThrow(() -> new IllegalArgumentException("종목을 찾을 수 없습니다: " + id));
         model.addAttribute("stock", stock);
+        model.addAttribute("activeMenu", "stocks");
         return "stock-detail";
     }
 

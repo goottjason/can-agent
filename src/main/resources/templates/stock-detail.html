@@ -6,10 +6,6 @@
     <title>CAN Agent - 종목 상세</title>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <style>
-        .nav { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .nav a { text-decoration: none; color: #666; padding: 8px 16px; border-radius: 5px; transition: all 0.2s; }
-        .nav a:hover { background: #f0f0f0; }
-        .nav a.active { background: #3498db; color: white; }
         .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .detail-header h1 { margin: 0; }
         .detail-header .code { color: #666; font-size: 0.9rem; }
@@ -34,93 +30,94 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <nav class="nav">
-            <a th:href="@{/}">대시보드</a>
-            <a th:href="@{/stocks}" class="active">종목 관리</a>
-        </nav>
+    <div class="layout">
+        <aside class="sidebar" th:replace="~{fragments/_sidebar :: sidebar}"></aside>
 
-        <div class="detail-header">
-            <div>
-                <h1 th:text="${stock.name}">종목명</h1>
-                <span class="code" th:text="'(' + ${stock.code} + ')'">(000000)</span>
-            </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <span class="market-tag"
-                      th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
-                      th:text="${stock.market}">KOSPI</span>
-                <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
-                      th:text="${stock.active} ? '활성' : '비활성'">활성</span>
-                <div th:if="${stock.active}">
-                    <form th:action="@{/stocks/{id}/deactivate(id=${stock.id})}" method="post" style="display: inline;">
-                        <button type="submit" class="btn btn-danger btn-sm">비활성화</button>
-                    </form>
+        <div class="main-content">
+            <div class="container">
+                <div class="detail-header">
+                    <div>
+                        <h1 th:text="${stock.name}">종목명</h1>
+                        <span class="code" th:text="'(' + ${stock.code} + ')'">(000000)</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span class="market-tag"
+                              th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
+                              th:text="${stock.market}">KOSPI</span>
+                        <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
+                              th:text="${stock.active} ? '활성' : '비활성'">활성</span>
+                        <div th:if="${stock.active}">
+                            <form th:action="@{/stocks/{id}/deactivate(id=${stock.id})}" method="post" style="display: inline;">
+                                <button type="submit" class="btn btn-danger btn-sm">비활성화</button>
+                            </form>
+                        </div>
+                        <div th:unless="${stock.active}">
+                            <form th:action="@{/stocks/{id}/activate(id=${stock.id})}" method="post" style="display: inline;">
+                                <button type="submit" class="btn btn-success btn-sm">활성화</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-                <div th:unless="${stock.active}">
-                    <form th:action="@{/stocks/{id}/activate(id=${stock.id})}" method="post" style="display: inline;">
-                        <button type="submit" class="btn btn-success btn-sm">활성화</button>
-                    </form>
+
+                <div class="detail-info">
+                    <div class="info-card">
+                        <h4>종목 코드</h4>
+                        <div class="value" th:text="${stock.code}">000000</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>시장</h4>
+                        <div class="value" th:text="${stock.market}">KOSPI</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>업종</h4>
+                        <div class="value" th:text="${stock.sector ?: '-'}">-</div>
+                    </div>
                 </div>
+
+                <section>
+                    <h2 class="section-title">종목 정보</h2>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <th style="width: 200px;">종목 코드</th>
+                                <td th:text="${stock.code}">005930</td>
+                            </tr>
+                            <tr>
+                                <th>종목명</th>
+                                <td th:text="${stock.name}">삼성전자</td>
+                            </tr>
+                            <tr>
+                                <th>시장</th>
+                                <td th:text="${stock.market}">KOSPI</td>
+                            </tr>
+                            <tr>
+                                <th>업종</th>
+                                <td th:text="${stock.sector ?: '-'}">반도체</td>
+                            </tr>
+                            <tr>
+                                <th>상태</th>
+                                <td>
+                                    <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
+                                          th:text="${stock.active} ? '활성 (자동매매 대상)' : '비활성 (자동매매 제외)'">활성</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>등록일</th>
+                                <td th:text="${#temporals.format(stock.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <div style="margin-top: 20px; display: flex; gap: 10px;">
+                    <a th:href="@{/stocks}" class="btn btn-primary">목록으로</a>
+                </div>
+
+                <footer>
+                    <p>CAN Agent v0.1.0 - William O'Neil 전략 기반 자동매매 시스템</p>
+                </footer>
             </div>
         </div>
-
-        <div class="detail-info">
-            <div class="info-card">
-                <h4>종목 코드</h4>
-                <div class="value" th:text="${stock.code}">000000</div>
-            </div>
-            <div class="info-card">
-                <h4>시장</h4>
-                <div class="value" th:text="${stock.market}">KOSPI</div>
-            </div>
-            <div class="info-card">
-                <h4>업종</h4>
-                <div class="value" th:text="${stock.sector ?: '-'}">-</div>
-            </div>
-        </div>
-
-        <section>
-            <h2 class="section-title">종목 정보</h2>
-            <table>
-                <tbody>
-                    <tr>
-                        <th style="width: 200px;">종목 코드</th>
-                        <td th:text="${stock.code}">005930</td>
-                    </tr>
-                    <tr>
-                        <th>종목명</th>
-                        <td th:text="${stock.name}">삼성전자</td>
-                    </tr>
-                    <tr>
-                        <th>시장</th>
-                        <td th:text="${stock.market}">KOSPI</td>
-                    </tr>
-                    <tr>
-                        <th>업종</th>
-                        <td th:text="${stock.sector ?: '-'}">반도체</td>
-                    </tr>
-                    <tr>
-                        <th>상태</th>
-                        <td>
-                            <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
-                                  th:text="${stock.active} ? '활성 (자동매매 대상)' : '비활성 (자동매매 제외)'">활성</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>등록일</th>
-                        <td th:text="${#temporals.format(stock.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <div style="margin-top: 20px; display: flex; gap: 10px;">
-            <a th:href="@{/stocks}" class="btn btn-primary">목록으로</a>
-        </div>
-
-        <footer>
-            <p>CAN Agent v0.1.0 - William O'Neil 전략 기반 자동매매 시스템</p>
-        </footer>
     </div>
 </body>
 </html>

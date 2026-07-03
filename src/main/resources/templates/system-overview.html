@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAN Agent - 시스템 소개</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        .doc-card { background: white; padding: 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
+        .doc-card h2 { font-size: 1.2rem; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #4fc3f7; display: inline-block; }
+        .doc-card h3 { font-size: 1.05rem; color: #333; margin: 18px 0 10px; }
+        .doc-card p, .doc-card li { font-size: 0.92rem; color: #444; line-height: 1.7; }
+        .doc-card ul { padding-left: 20px; margin: 8px 0; }
+        .doc-card li { margin-bottom: 6px; }
+        .doc-card code { background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #e74c3c; }
+        .doc-card .highlight { background: #e8f4fd; border-left: 4px solid #4fc3f7; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+        .doc-card .highlight strong { color: #1a1a2e; }
+        .doc-card .warn { background: #fff8e1; border-left: 4px solid #ffb300; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+        .doc-card table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        .doc-card table th, .doc-card table td { padding: 10px 12px; border: 1px solid #e0e0e0; font-size: 0.88rem; text-align: left; }
+        .doc-card table th { background: #f8f9fa; color: #555; font-weight: 600; }
+        .doc-card table td { color: #333; }
+        .doc-card .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; margin-right: 4px; }
+        .tag-green { background: #d4edda; color: #155724; }
+        .tag-red { background: #f8d7da; color: #721c24; }
+        .tag-blue { background: #d1ecf1; color: #0c5460; }
+        .tag-yellow { background: #fff3cd; color: #856404; }
+        .flow-diagram { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 14px 0; text-align: center; font-size: 0.88rem; color: #333; line-height: 2.2; }
+        .flow-diagram .arrow { color: #4fc3f7; font-weight: bold; margin: 0 6px; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar" th:replace="~{fragments/_sidebar :: sidebar}"></aside>
+
+        <div class="main-content">
+            <div class="container">
+                <header>
+                    <h1>시스템 소개</h1>
+                    <p class="subtitle">CANSLIM + 컵앤핸들 자동매매 시스템 전체 구조</p>
+                </header>
+
+                <div class="doc-card">
+                    <h2>목차</h2>
+                    <ul>
+                        <li><a th:href="@{/system/overview}" style="color:#4fc3f7;">전체 개요</a> - 시스템 아키텍처와 핵심 흐름</li>
+                        <li><a th:href="@{/system/monitoring}" style="color:#4fc3f7;">모니터링 방식</a> - 자동 스캔 → 매수/매도 흐름</li>
+                        <li><a th:href="@{/system/canslim}" style="color:#4fc3f7;">CANSLIM 점수 체계</a> - 6개 요소별 점수 기준</li>
+                        <li><a th:href="@{/system/cup-handle}" style="color:#4fc3f7;">컵앤핸들 알고리즘</a> - 패턴 탐지 및 점수 산출</li>
+                        <li><a th:href="@{/system/trading}" style="color:#4fc3f7;">매매 전략</a> - 매수/매도 조건, 포지션 사이징</li>
+                    </ul>
+                </div>
+
+                <div class="doc-card">
+                    <h2>시스템 아키텍처</h2>
+
+                    <h3>기술 스택</h3>
+                    <table>
+                        <tr><th>구분</th><th>기술</th></tr>
+                        <tr><td>백엔드</td><td>Spring Boot 3.3, Java 17, Spring Data JPA</td></tr>
+                        <tr><td>데이터베이스</td><td>PostgreSQL 16 (Docker)</td></tr>
+                        <tr><td>증권사 API</td><td>한국투자증권 Open API (실전 계좌)</td></tr>
+                        <tr><td>배포</td><td>Docker Compose, Nginx 리버스 프록시</td></tr>
+                        <tr><td>알림</td><td>Telegram Bot</td></tr>
+                        <tr><td>프론트엔드</td><td>Thymeleaf (서버 사이드 렌더링)</td></tr>
+                    </table>
+
+                    <h3>핵심 흐름</h3>
+                    <div class="flow-diagram">
+                        <strong>1단계: 데이터 수집</strong><br>
+                        <span class="tag tag-blue">매일 15:30 KST</span> 장 마감 후 가격 데이터 동기화<br>
+                        <span class="tag tag-green">분기별</span> DART 재무제표 수집 → 금융지표 계산<br><br>
+
+                        <span class="arrow">▼</span><br><br>
+
+                        <strong>2단계: 점수 산출</strong><br>
+                        <span class="tag tag-yellow">매일 19:00 KST</span> 전체 2,763종목 CANSLIM + 컵앤핸들 분석<br>
+                        → <code>analysis_scores</code> 테이블에 종목별 일일 점수 저장 (UPSERT)<br><br>
+
+                        <span class="arrow">▼</span><br><br>
+
+                        <strong>3단계: 장중 모니터링</strong><br>
+                        <span class="tag tag-red">09:00~15:30 KST</span> 5분마다 순환<br>
+                        &nbsp;&nbsp;① 보유 종목 매도 체크 (손절·익절·점수하락)<br>
+                        &nbsp;&nbsp;② ~400종목 스캔 → 매수 신호 탐지<br>
+                        &nbsp;&nbsp;③ 매수 주문 실행 (최대 3회 재시도)<br>
+                        &nbsp;&nbsp;④ Telegram 알림 발송<br><br>
+
+                        <span class="arrow">▼</span><br><br>
+
+                        <strong>4단계: 리스크 관리</strong><br>
+                        손절: <code>-7%</code> | 익절: <code>+20%</code> | 최대 보유: <code>10종목</code> | 종목당 한도: <code>10%</code>
+                    </div>
+                </div>
+
+                <div class="doc-card">
+                    <h2>데이터베이스 구조</h2>
+                    <table>
+                        <tr><th>테이블</th><th>설명</th><th>주요 컬럼</th></tr>
+                        <tr><td><code>stocks</code></td><td>상장종목 마스터</td><td>code, name, market, sector, active</td></tr>
+                        <tr><td><code>stock_prices</code></td><td>일별 가격/거래량</td><td>open, high, low, close, volume, change_rate</td></tr>
+                        <tr><td><code>financial_statements</code></td><td>분기별 재무제표</td><td>revenue, operating_profit, net_income, eps, roe</td></tr>
+                        <tr><td><code>analysis_scores</code></td><td>종목별 일일 분석 점수</td><td>can_slim_score, cup_score, total_score (UPSERT)</td></tr>
+                        <tr><td><code>portfolios</code></td><td>보유 종목 현황</td><td>quantity, avg_buy_price, current_price, profit_rate</td></tr>
+                        <tr><td><code>trades</code></td><td>매매 기록</td><td>trade_type (BUY/SELL), price, quantity, reason</td></tr>
+                    </table>
+                </div>
+
+                <div class="doc-card">
+                    <h2>환경 설정</h2>
+                    <div class="highlight">
+                        <strong>운영 서버:</strong> <code>http://168.107.31.154/can-agent</code><br>
+                        <strong>프로필:</strong> <code>prod</code> (PostgreSQL + Telegram 알림 활성화)<br>
+                        <strong>시간대:</strong> 모든 스케줄은 <code>zone = "Asia/Seoul"</code>로 KST 기준 동작
+                    </div>
+                    <div class="warn">
+                        <strong>주의:</strong> 서버 시간은 UTC이지만, 모든 스케줄러는 KST(UTC+9)로 변환 후 실행됩니다.<br>
+                        <code>LocalDateTime.now()</code> 호출 시 반드시 KST 변환 필요.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

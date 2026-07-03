@@ -126,8 +126,41 @@ public class DashboardController {
         model.addAttribute("monitorLastCheck", intradayMonitorWorker != null ? intradayMonitorWorker.getLastCheckTime() : null);
         model.addAttribute("monitorSignalCount", intradayMonitorWorker != null ? intradayMonitorWorker.getLastSignalCount() : 0);
         model.addAttribute("monitorSignals", intradayMonitorWorker != null ? intradayMonitorWorker.getLastSignals() : java.util.Collections.emptyList());
+        model.addAttribute("activeMenu", "dashboard");
 
         return "dashboard";
+    }
+
+    // ========== 시스템 소개 페이지 ==========
+
+    @GetMapping("/system/overview")
+    public String systemOverview(Model model) {
+        model.addAttribute("activeMenu", "overview");
+        return "system-overview";
+    }
+
+    @GetMapping("/system/monitoring")
+    public String systemMonitoring(Model model) {
+        model.addAttribute("activeMenu", "monitoring");
+        return "system-monitoring";
+    }
+
+    @GetMapping("/system/canslim")
+    public String systemCanslim(Model model) {
+        model.addAttribute("activeMenu", "canslim");
+        return "system-canslim";
+    }
+
+    @GetMapping("/system/cup-handle")
+    public String systemCupHandle(Model model) {
+        model.addAttribute("activeMenu", "cup-handle");
+        return "system-cup-handle";
+    }
+
+    @GetMapping("/system/trading")
+    public String systemTrading(Model model) {
+        model.addAttribute("activeMenu", "trading");
+        return "system-trading";
     }
 
     private long parseLongSafe(String value) {

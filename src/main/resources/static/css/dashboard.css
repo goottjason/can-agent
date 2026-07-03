@@ -11,15 +11,113 @@ body {
     line-height: 1.6;
 }
 
+/* ===== Sidebar Layout ===== */
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 240px;
+    min-height: 100vh;
+    background: #1a1a2e;
+    color: #ccc;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+}
+
+.sidebar-brand {
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+.sidebar-brand h2 {
+    font-size: 1.3rem;
+    color: #fff;
+    margin-bottom: 2px;
+}
+
+.sidebar-brand p {
+    font-size: 0.75rem;
+    color: #7a7a9a;
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 12px 0;
+    overflow-y: auto;
+}
+
+.nav-section {
+    margin-bottom: 8px;
+}
+
+.nav-section-title {
+    padding: 8px 20px 4px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #5a5a7a;
+    font-weight: 600;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    color: #aaa;
+    text-decoration: none;
+    font-size: 0.88rem;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+}
+
+.nav-link:hover {
+    background: #2a2a4a;
+    color: #fff;
+}
+
+.nav-link.active {
+    background: #2a2a4a;
+    color: #4fc3f7;
+    border-left-color: #4fc3f7;
+    font-weight: 500;
+}
+
+.nav-icon {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #2a2a4a;
+    font-size: 0.75rem;
+    color: #5a5a7a;
+}
+
+.main-content {
+    flex: 1;
+    margin-left: 240px;
+    padding: 24px 32px;
+    min-width: 0;
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 0;
 }
 
 header {
-    text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
     padding: 20px;
     background: white;
     border-radius: 8px;
@@ -27,14 +125,14 @@ header {
 }
 
 header h1 {
-    font-size: 2rem;
+    font-size: 1.6rem;
     color: #1a1a1a;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 header .subtitle {
     color: #666;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
 }
 
 .account-info {
@@ -270,18 +368,27 @@ footer {
 }
 
 @media (max-width: 768px) {
+    .sidebar {
+        position: static;
+        width: 100%;
+        min-height: auto;
+    }
+    .layout {
+        flex-direction: column;
+    }
+    .main-content {
+        margin-left: 0;
+        padding: 16px;
+    }
     .account-info {
         grid-template-columns: 1fr;
     }
-
     .summary {
         grid-template-columns: repeat(2, 1fr);
     }
-
     .content-grid {
         grid-template-columns: 1fr;
     }
-
     .stats {
         flex-wrap: wrap;
         gap: 15px;

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<aside class="sidebar" th:fragment="sidebar">
+    <div class="sidebar-brand">
+        <h2>CAN Agent</h2>
+        <p>CANSLIM 자동매매</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section">
+            <div class="nav-section-title">시스템 소개</div>
+            <a th:href="@{/system/overview}" class="nav-link" th:classappend="${activeMenu == 'overview'} ? 'active' : ''">
+                <span class="nav-icon">&#x2139;</span> 전체 개요
+            </a>
+            <a th:href="@{/system/monitoring}" class="nav-link" th:classappend="${activeMenu == 'monitoring'} ? 'active' : ''">
+                <span class="nav-icon">&#x23F1;</span> 모니터링 방식
+            </a>
+            <a th:href="@{/system/canslim}" class="nav-link" th:classappend="${activeMenu == 'canslim'} ? 'active' : ''">
+                <span class="nav-icon">&#x1F4CA;</span> CANSLIM 점수
+            </a>
+            <a th:href="@{/system/cup-handle}" class="nav-link" th:classappend="${activeMenu == 'cup-handle'} ? 'active' : ''">
+                <span class="nav-icon">&#x1F4C9;</span> 컵앤핸들 알고리즘
+            </a>
+            <a th:href="@{/system/trading}" class="nav-link" th:classappend="${activeMenu == 'trading'} ? 'active' : ''">
+                <span class="nav-icon">&#x1F4B0;</span> 매매 전략
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">운영</div>
+            <a th:href="@{/}" class="nav-link" th:classappend="${activeMenu == 'dashboard'} ? 'active' : ''">
+                <span class="nav-icon">&#x1F4CB;</span> 대시보드
+            </a>
+            <a th:href="@{/stocks}" class="nav-link" th:classappend="${activeMenu == 'stocks'} ? 'active' : ''">
+                <span class="nav-icon">&#x1F4C2;</span> 종목 관리
+            </a>
+        </div>
+    </nav>
+
+    <div class="sidebar-footer">
+        <p>CAN Agent v0.1.0</p>
+    </div>
+</aside>
+</html>

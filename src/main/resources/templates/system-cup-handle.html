@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAN Agent - 컵앤핸들 알고리즘</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <style>
+        .doc-card { background: white; padding: 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
+        .doc-card h2 { font-size: 1.2rem; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #4fc3f7; display: inline-block; }
+        .doc-card h3 { font-size: 1.05rem; color: #333; margin: 18px 0 10px; }
+        .doc-card p, .doc-card li { font-size: 0.92rem; color: #444; line-height: 1.7; }
+        .doc-card ul { padding-left: 20px; margin: 8px 0; }
+        .doc-card li { margin-bottom: 6px; }
+        .doc-card code { background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #e74c3c; }
+        .doc-card .highlight { background: #e8f4fd; border-left: 4px solid #4fc3f7; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+        .doc-card .highlight strong { color: #1a1a2e; }
+        .doc-card .warn { background: #fff8e1; border-left: 4px solid #ffb300; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+        .doc-card table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        .doc-card table th, .doc-card table td { padding: 10px 12px; border: 1px solid #e0e0e0; font-size: 0.88rem; text-align: left; }
+        .doc-card table th { background: #f8f9fa; color: #555; font-weight: 600; }
+        .doc-card table td { color: #333; }
+        .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; margin-right: 4px; }
+        .tag-green { background: #d4edda; color: #155724; }
+        .tag-red { background: #f8d7da; color: #721c24; }
+        .tag-blue { background: #d1ecf1; color: #0c5460; }
+        .tag-yellow { background: #fff3cd; color: #856404; }
+        .score-box { display: inline-block; background: #1a1a2e; color: #4fc3f7; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-right: 6px; }
+        .pattern-visual { background: #f8f9fa; padding: 24px; border-radius: 8px; margin: 16px 0; text-align: center; font-family: monospace; line-height: 1.8; }
+        .pattern-visual .cup { color: #4fc3f7; font-weight: bold; }
+        .pattern-visual .handle { color: #ff9800; font-weight: bold; }
+        .pattern-visual .breakout { color: #4caf50; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar" th:replace="~{fragments/_sidebar :: sidebar}"></aside>
+
+        <div class="main-content">
+            <div class="container">
+                <header>
+                    <h1>컵앤핸들 알고리즘</h1>
+                    <p class="subtitle"> Cup & Handle 패턴 탐지 및 점수 산출 로직</p>
+                </header>
+
+                <div class="doc-card">
+                    <h2>컵앤핸들이란?</h2>
+                    <p>컵앤핸들(Cup & Handle)은 William O'Neil이 제안한 차트 패턴으로, 주가가 일정 기간 하락 후 회복하여 "컵" 형태를 만들고, 이후 소폭 조정으로 "핸들"을 형성한 뒤 상승 돌파하는 패턴입니다.</p>
+
+                    <div class="pattern-visual">
+                        <span style="color:#999;">가격</span><br>
+                        &nbsp;&nbsp;&nbsp;&#x2571; <span class="breakout">▲ 돌파!</span><br>
+                        &nbsp;&nbsp;&#x2571;&#x2572;&nbsp;&nbsp;&nbsp; <span class="handle">핸들</span><br>
+                        &nbsp;&#x2571;&nbsp;&nbsp;&#x2572;&#x2571;&#x2572;<br>
+                        &#x2571;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2572;<br>
+                        <span class="cup">&nbsp;컵 (U자형)</span><br>
+                        &#x2572;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2571;<br>
+                        &nbsp;&nbsp;&#x2572;&#x2571;&#x2572;&#x2571;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&#x2572;&#x2571;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#999;">바닥</span>
+                    </div>
+                </div>
+
+                <div class="doc-card">
+                    <h2>탐지 파라미터</h2>
+
+                    <h3>컵 (Cup) 탐지 조건</h3>
+                    <table>
+                        <tr><th>파라미터</th><th>값</th><th>설명</th></tr>
+                        <tr><td>최소 컵 깊이</td><td><code>12%</code></td><td>컵 꼭대기 대비 최소 하락폭</td></tr>
+                        <tr><td>최대 컵 깊이</td><td><code>33%</code></td><td>컵 꼭대기 대비 최대 하락폭</td></tr>
+                        <tr><td>최소 컵 기간</td><td><code>7주</code></td><td>최소 형성 기간</td></tr>
+                        <tr><td>최대 컵 기간</td><td><code>65주</code></td><td>최대 형성 기간</td></tr>
+                        <tr><td>컵 완성 조건</td><td>현재가 ≥ 컵 꼭대기 × <code>0.95</code></td><td>컵 꼭대기 대비 95% 이상 회복</td></tr>
+                        <tr><td>최소 데이터</td><td><code>20개</code> 이상의 가격 데이터</td><td>부족 시 패턴 탐지 불가</td></tr>
+                    </table>
+
+                    <h3>핸들 (Handle) 탐지 조건</h3>
+                    <table>
+                        <tr><th>파라미터</th><th>값</th><th>설명</th></tr>
+                        <tr><td>최소 핸들 깊이</td><td><code>5%</code></td><td>컵 꼭대기 대비 최소 하락폭</td></tr>
+                        <tr><td>최대 핸들 깊이</td><td><code>15%</code></td><td>컵 꼭대기 대비 최대 하락폭</td></tr>
+                        <tr><td>최대 핸들 기간</td><td><code>4주</code></td><td>최대 형성 기간</td></tr>
+                    </table>
+
+                    <h3>돌파 (Breakout) 조건</h3>
+                    <div class="highlight">
+                        현재 종가 > 핸들 고점 (handle high) → <strong>돌파 발생</strong>
+                    </div>
+                </div>
+
+                <div class="doc-card">
+                    <h2>점수 산출</h2>
+
+                    <h3>1단계: 컵 점수 (최대 50점)</h3>
+                    <table>
+                        <tr><th>조건</th><th>추가 점수</th></tr>
+                        <tr><td>컵 탐지 기본 점수</td><td><span class="score-box">30</span></td></tr>
+                        <tr><td>컵 깊이 20%~25% (이상적)</td><td><span class="tag tag-green">+10</span></td></tr>
+                        <tr><td>컵 기간 7~30주 (이상적)</td><td><span class="tag tag-green">+10</span></td></tr>
+                    </table>
+
+                    <h3>2단계: 전체 패턴 점수 (최대 90점)</h3>
+                    <table>
+                        <tr><th>조건</th><th>추가 점수</th></tr>
+                        <tr><td>핸들 깊이 10%~12% (이상적)</td><td><span class="tag tag-green">+20</span></td></tr>
+                        <tr><td>핸들 깊이 범위 밖</td><td><span class="tag tag-blue">+10</span></td></tr>
+                        <tr><td>돌파 발생</td><td><span class="tag tag-green">+20</span></td></tr>
+                    </table>
+
+                    <div class="highlight">
+                        <strong>최대 점수:</strong> 50 (컵) + 20 (이상적 핸들) + 20 (돌파) = <strong>90점</strong><br>
+                        <strong>최소 점수 (패턴 탐지 시):</strong> 30 (기본 컵) + 10 (비이상적 핸들) + 0 (미돌파) = <strong>40점</strong>
+                    </div>
+                </div>
+
+                <div class="doc-card">
+                    <h2>패턴 유형과 매매 신호</h2>
+                    <table>
+                        <tr><th>패턴 유형</th><th>설명</th><th>매수 신호</th></tr>
+                        <tr>
+                            <td><span class="tag tag-red">NONE</span></td>
+                            <td>패턴 없음</td>
+                            <td>아니오</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-yellow">CUP_FORMING</span></td>
+                            <td>컵 형성 중 (핸들 미형성)</td>
+                            <td>아니오</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-blue">HANDLE_COMPLETE</span></td>
+                            <td>핸들 완성 (돌파 전)</td>
+                            <td>조건부 (CANSLIM 40점 이상 + 핸들만으로는 매수 안 함)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-green">BREAKOUT</span></td>
+                            <td>돌파 발생</td>
+                            <td><strong>예</strong> (강력 매수 신호)</td>
+                        </tr>
+                    </table>
+
+                    <div class="warn">
+                        <strong>중요:</strong> <code>HANDLE_COMPLETE</code> 상태에서는 CANSLIM 점수가 40점 이상일 때만 매수합니다. <code>BREAKOUT</code>에서만 별도 조건 없이 매수 신호가 발생합니다.
+                    </div>
+                </div>
+
+                <div class="doc-card">
+                    <h2>목표가 계산</h2>
+                    <div class="highlight">
+                        <strong>목표가</strong> = 컵 꼭대기 + (컵 꼭대기 - 컵 바닥)<br>
+                        예: 컵 꼭대기 50,000원, 바닥 40,000원 → 목표가 = 50,000 + (50,000 - 40,000) = <strong>60,000원</strong>
+                    </div>
+                    <p>실제 매도 판단에는 목표가를 직접 사용하지 않으며, 손절/익절 기준으로 매도를 실행합니다.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
