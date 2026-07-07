@@ -35,3 +35,7 @@ logs/
 # SSH Keys
 *.key
 *.pem
+
+# Harness workspace (휘발성 중간 산출물)
+_workspace/
+_workspace_*/
