@@ -52,7 +52,7 @@ trading:
   position-rate: 10              # 종목당 최대 배분 비율 (%)
   stop-loss-rate: 7              # 손절 기준 (%)
   take-profit-rate: 20           # 익절 기준 (%)
-  min-score: 120                 # 매수 최소 점수 (CANSLIM + 컵앤핸들, 최대 180)
+  min-score: 120                 # 매수 최소 점수 (CANSLIM + 컵앤핸들, 최대 190)
   real-trading: false            # 실제 매매 실행 여부 (true: 실전, false: 시뮬레이션)
   secret: ${TRADE_SECRET:}       # trade/run 엔드포인트 인증 키 (비어있으면 인증 해제)
 

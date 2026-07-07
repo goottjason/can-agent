@@ -35,9 +35,9 @@
 | L 업종선도 | IndustryLeaderAnalyzer | 15 | 13주 주가 + sector + ROE | **0점** (업종 없음/동종 2개 미만) |
 | I 기관 | InstitutionalInvestorAnalyzer | 15 | 거래량 4주+20일 (※실제 기관 데이터 아닌 거래량 프록시) | **0점** |
 | M 시장방향 | MarketDirectionAnalyzer | 15 | 주가 50일(MA50)+200일(MA200) | **0점** |
-| 컵앤핸들 | CupAndHandleAnalyzer | 30–70 | 주가 65주+, 최소 20개 포인트 | 패턴 없음(0) |
+| 컵앤핸들 | CupAndHandleAnalyzer | 30–90 | 주가 65주+, 최소 20개 포인트 | 패턴 없음(0) |
 
-- CANSLIM 만점 100, 컵 포함 최대 170~180.
+- CANSLIM 만점 100, 컵 최대 90(base30 +깊이/기간 각10 → 컵단독 50, 핸들+돌파 포함 풀패턴 최대 90), 총점 최대 **190**.
 - `CanSlimResult.isBuySignal()` = 총점 ≥ **40** / `isStrongBuy()` ≥ 60.
 - **매수 게이트** (IntradayMonitorWorker :314-321): `(canSlimBuy || cupBuy)` **AND** `CANSLIM+컵 총점 ≥ trading.min-score(기본 120)`. 두 조건 모두 무로그 reject.
 - ⚠️ **불일치**: `TradingStrategyService`의 min-score 기본값은 60(:50), 워커 경로는 120 — 두 경로 상이.

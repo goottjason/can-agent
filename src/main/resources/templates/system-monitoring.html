@@ -6,24 +6,7 @@
     <title>CAN Agent - 모니터링 방식</title>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <style>
-        .doc-card { background: white; padding: 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
-        .doc-card h2 { font-size: 1.2rem; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #4fc3f7; display: inline-block; }
-        .doc-card h3 { font-size: 1.05rem; color: #333; margin: 18px 0 10px; }
-        .doc-card p, .doc-card li { font-size: 0.92rem; color: #444; line-height: 1.7; }
-        .doc-card ul { padding-left: 20px; margin: 8px 0; }
-        .doc-card li { margin-bottom: 6px; }
-        .doc-card code { background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #e74c3c; }
-        .doc-card .highlight { background: #e8f4fd; border-left: 4px solid #4fc3f7; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
-        .doc-card .highlight strong { color: #1a1a2e; }
-        .doc-card table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-        .doc-card table th, .doc-card table td { padding: 10px 12px; border: 1px solid #e0e0e0; font-size: 0.88rem; text-align: left; }
-        .doc-card table th { background: #f8f9fa; color: #555; font-weight: 600; }
-        .doc-card table td { color: #333; }
-        .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; margin-right: 4px; }
-        .tag-green { background: #d4edda; color: #155724; }
-        .tag-red { background: #f8d7da; color: #721c24; }
-        .tag-blue { background: #d1ecf1; color: #0c5460; }
-        .tag-yellow { background: #fff3cd; color: #856404; }
+        /* 공통 .doc-card / .tag 스타일은 dashboard.css로 승격됨. 아래는 이 페이지 전용. */
         .flow-step { display: flex; gap: 16px; margin: 16px 0; align-items: flex-start; }
         .flow-step-num { width: 36px; height: 36px; background: #4fc3f7; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem; flex-shrink: 0; }
         .flow-step-content { flex: 1; }
@@ -57,7 +40,7 @@
                         <div class="flow-step-num">2</div>
                         <div class="flow-step-content">
                             <strong>전체 점수 산출 (19:00 KST)</strong>
-                            <p><code>AutoTradingWorker</code>가 2,763종목 전수 분석합니다. 각 종목의 CANSLIM 6요소 점수와 컵앤핸들 점수를 계산하여 <code>analysis_scores</code> 테이블에 UPSERT합니다. 이 과정에서는 매수/매도를 실행하지 않습니다.</p>
+                            <p><code>AutoTradingWorker</code>가 전체 활성 종목을 전수 분석합니다. 각 종목의 CANSLIM 6요소 점수와 컵앤핸들 점수를 계산하여 <code>analysis_scores</code> 테이블에 UPSERT합니다. 이 과정에서는 매수/매도를 실행하지 않습니다.</p>
                         </div>
                     </div>
 
@@ -65,7 +48,7 @@
                         <div class="flow-step-num">3</div>
                         <div class="flow-step-content">
                             <strong>대상 종목 필터링</strong>
-                            <p>전일 기준 거래량 상위 200종목 + 변동률 상위 200종목을 선별합니다. 중복 제거 후 약 300~400종목이 매수 후보가 됩니다. 2,763종목 전수 스캔 대비 스캔 시간이 60분 → 2~3분으로 대폭 단축됩니다.</p>
+                            <p>전일 기준 거래량 상위 200종목 + 변동률 상위 200종목을 선별합니다. 중복 제거 후 약 300~400종목이 매수 후보가 됩니다. 전체 활성 종목을 전수 스캔하는 방식 대비 장중 스캔 시간을 크게 단축합니다.</p>
                         </div>
                     </div>
 

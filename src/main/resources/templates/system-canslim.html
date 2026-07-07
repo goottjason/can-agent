@@ -6,23 +6,7 @@
     <title>CAN Agent - CANSLIM 점수 체계</title>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <style>
-        .doc-card { background: white; padding: 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
-        .doc-card h2 { font-size: 1.2rem; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #4fc3f7; display: inline-block; }
-        .doc-card h3 { font-size: 1.05rem; color: #333; margin: 18px 0 10px; }
-        .doc-card p, .doc-card li { font-size: 0.92rem; color: #444; line-height: 1.7; }
-        .doc-card ul { padding-left: 20px; margin: 8px 0; }
-        .doc-card li { margin-bottom: 6px; }
-        .doc-card code { background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #e74c3c; }
-        .doc-card .highlight { background: #e8f4fd; border-left: 4px solid #4fc3f7; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
-        .doc-card .highlight strong { color: #1a1a2e; }
-        .doc-card table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-        .doc-card table th, .doc-card table td { padding: 10px 12px; border: 1px solid #e0e0e0; font-size: 0.88rem; text-align: left; }
-        .doc-card table th { background: #f8f9fa; color: #555; font-weight: 600; }
-        .doc-card table td { color: #333; }
-        .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; margin-right: 4px; }
-        .tag-green { background: #d4edda; color: #155724; }
-        .tag-red { background: #f8d7da; color: #721c24; }
-        .tag-blue { background: #d1ecf1; color: #0c5460; }
+        /* 공통 .doc-card / .tag 스타일은 dashboard.css로 승격됨. 아래는 이 페이지 전용. */
         .score-box { display: inline-block; background: #1a1a2e; color: #4fc3f7; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-right: 6px; }
         .component-header { display: flex; align-items: center; gap: 12px; margin: 24px 0 12px; padding: 12px 16px; background: #f8f9fa; border-radius: 8px; }
         .component-header .letter { font-size: 1.4rem; font-weight: bold; color: #4fc3f7; }
@@ -42,26 +26,30 @@
 
                 <div class="doc-card">
                     <h2>점수 개요</h2>
-                    <p>CANSLIM은 7개 영문 이니셜로 구성된 투자 전략입니다. 각 요소를 분석하여 <strong>독립적인 점수</strong>를 산출하고, 합산하여 종합 점수를 결정합니다.</p>
+                    <p>CANSLIM은 William O'Neil의 성장주 투자 전략입니다. 본 시스템은 그중 6개 요소(<strong>C·A·S·L·I·M</strong>)를 정량화하여 <strong>요소별 독립 점수</strong>를 산출하고, 합산하여 CANSLIM 종합 점수(최대 100점)를 결정합니다. 대시보드 리더보드의 C·A·S·L·I·M 컬럼과 동일한 순서·의미입니다.</p>
 
                     <table>
-                        <tr><th>요소</th><th>이니셜</th><th>만점</th><th>핵심 지표</th></tr>
-                        <tr><td>분기 실적</td><td><strong>C</strong>urrent Quarterly Earnings</td><td><span class="score-box">20</span></td><td>전분기 대비 EPS 성장률</td></tr>
-                        <tr><td>연간 실적</td><td><strong>A</strong>nnual Earnings Growth</td><td><span class="score-box">20</span></td><td>전년 대비 연간 EPS 성장률</td></tr>
-                        <tr><td>수급</td><td><strong>S</strong>upply & Demand</td><td><span class="score-box">15</span></td><td>거래량 비율 + 주가 추세</td></tr>
-                        <tr><td>시장 방향</td><td><strong>L</strong>eader or Laggard</td><td><span class="score-box">15</span></td><td>이동평균선 배열 (MA50, MA200)</td></tr>
-                        <tr><td>업종 선도주</td><td><strong>I</strong>ndustry Position</td><td><span class="score-box">15</span></td><td>업종 내 상대 강도 + ROE</td></tr>
-                        <tr><td>기관 투자자</td><td><strong>M</strong>arket Sponsor</td><td><span class="score-box">15</span></td><td>기관 수급 패턴</td></tr>
+                        <tr><th>이니셜</th><th>요소</th><th>만점</th><th>핵심 지표</th></tr>
+                        <tr><td><strong>C</strong> — Current Quarterly Earnings</td><td>분기 실적</td><td><span class="score-box">20</span></td><td>전년 동기 대비 분기 EPS 성장률</td></tr>
+                        <tr><td><strong>A</strong> — Annual Earnings Growth</td><td>연간 실적</td><td><span class="score-box">20</span></td><td>연간 EPS 성장률 (Q4 기준)</td></tr>
+                        <tr><td><strong>S</strong> — Supply & Demand</td><td>수급</td><td><span class="score-box">15</span></td><td>거래량 비율 + 주가 추세</td></tr>
+                        <tr><td><strong>L</strong> — Leader (업종 선도주)</td><td>업종 선도</td><td><span class="score-box">15</span></td><td>업종 내 상대 강도 + ROE</td></tr>
+                        <tr><td><strong>I</strong> — Institutional</td><td>기관 (거래량 프록시)</td><td><span class="score-box">15</span></td><td>거래량 증가율 + 고거래량 일수</td></tr>
+                        <tr><td><strong>M</strong> — Market Direction</td><td>시장 방향</td><td><span class="score-box">15</span></td><td>이동평균선 배열 (MA50, MA200)</td></tr>
                         <tr style="background:#f0f7ff; font-weight:600;">
                             <td colspan="2">합계</td>
                             <td><span class="score-box" style="background:#4fc3f7;color:white;">100</span></td>
-                            <td>CANSLIM 최대 점수</td>
+                            <td>CANSLIM 최대 점수 (컵앤핸들 별도 합산)</td>
                         </tr>
                     </table>
 
                     <div class="highlight">
                         <strong>매수 신호 기준:</strong> CANSLIM 총점 ≥ <code>40</code>점 → 매수 신호, ≥ <code>60</code>점 → 강력 매수 신호<br>
-                        <strong>매도 기준:</strong> CANSLIM 총점 < <code>40</code>점 → 점수 하락 매도
+                        <strong>매도 기준:</strong> CANSLIM 총점 < <code>40</code>점 → 점수 하락 매도<br>
+                        <strong>실제 매수 실행:</strong> CANSLIM 매수 신호(또는 컵앤핸들 신호) <strong>이면서</strong> CANSLIM + 컵앤핸들 총점 ≥ <code>120</code>점일 때만 주문됩니다.
+                    </div>
+                    <div class="warn">
+                        <strong>I(기관) 요소 주의:</strong> 실제 기관 순매수 데이터가 아니라, 거래량 급증·고거래량 일수를 이용한 <strong>거래량 프록시</strong>로 기관 매집을 추정합니다.
                     </div>
                 </div>
 
@@ -130,25 +118,6 @@
                     <p style="margin-top:10px;color:#888;font-size:0.85rem;">데이터 요구사항: 최소 20개 이상의 과거 가격 데이터, 최근 4주 내 최소 1건.</p>
                 </div>
 
-                <!-- L: 시장 방향 -->
-                <div class="doc-card">
-                    <div class="component-header">
-                        <span class="letter">M</span>
-                        <span class="name">시장 방향 (Market Direction) — 만점 15</span>
-                    </div>
-                    <p>이동평균선 배열을 분석하여 시장의 강세/약세를 판단합니다. 주가, 50일 이동평균선(MA50), 200일 이동평균선(MA200)의 관계를 평가합니다.</p>
-
-                    <table>
-                        <tr><th>조건</th><th>점수</th><th>시장 판단</th></tr>
-                        <tr><td>주가 > MA50 <strong>AND</strong> MA50 > MA200 (3선 정배열)</td><td><span class="tag tag-green">15점 (만점)</span></td><td>강세</td></tr>
-                        <tr><td>주가 > MA50 <strong>AND</strong> MA50 ≤ MA200</td><td><span class="tag tag-blue">5점</span></td><td>보통</td></tr>
-                        <tr><td>주가 ≤ MA50 <strong>AND</strong> MA50 > MA200</td><td><span class="tag tag-blue">5점</span></td><td>보통</td></tr>
-                        <tr><td>주가 ≤ MA50 <strong>AND</strong> MA50 ≤ MA200 (3선 역배열)</td><td><span class="tag tag-red">0점</span></td><td>약세</td></tr>
-                    </table>
-
-                    <p style="margin-top:10px;color:#888;font-size:0.85rem;">산출 방식: <code>+5</code> (주가 > MA50) + <code>+5</code> (MA50 > MA200) + <code>+5</code> (3선 정배열 보너스). 데이터 부족 시 0점.</p>
-                </div>
-
                 <!-- L: 업종 선도주 -->
                 <div class="doc-card">
                     <div class="component-header">
@@ -182,7 +151,7 @@
                         <span class="letter">I</span>
                         <span class="name">기관 투자자 (Institutional Investor) — 만점 15</span>
                     </div>
-                    <p>기관의 매집 패턴을 거래량 증가율, 주가 변화, 고거래량 일수로 분석합니다.</p>
+                    <p>기관의 매집 패턴을 거래량 증가율, 주가 변화, 고거래량 일수로 분석합니다. <strong>실제 기관 순매수 데이터가 아니라 거래량 기반 프록시</strong>로 기관 매집을 추정하는 방식입니다.</p>
 
                     <p><strong>핵심 지표:</strong></p>
                     <ul>
@@ -202,6 +171,25 @@
                     </table>
 
                     <p style="margin-top:10px;color:#888;font-size:0.85rem;">데이터 요구사항: 최근 4주 내 최소 10건의 가격 데이터, 전체 20건 이상. 부족 시 0점.</p>
+                </div>
+
+                <!-- M: 시장 방향 -->
+                <div class="doc-card">
+                    <div class="component-header">
+                        <span class="letter">M</span>
+                        <span class="name">시장 방향 (Market Direction) — 만점 15</span>
+                    </div>
+                    <p>이동평균선 배열을 분석하여 시장의 강세/약세를 판단합니다. 주가, 50일 이동평균선(MA50), 200일 이동평균선(MA200)의 관계를 평가합니다.</p>
+
+                    <table>
+                        <tr><th>조건</th><th>점수</th><th>시장 판단</th></tr>
+                        <tr><td>주가 > MA50 <strong>AND</strong> MA50 > MA200 (3선 정배열)</td><td><span class="tag tag-green">15점 (만점)</span></td><td>강세</td></tr>
+                        <tr><td>주가 > MA50 <strong>AND</strong> MA50 ≤ MA200</td><td><span class="tag tag-blue">5점</span></td><td>보통</td></tr>
+                        <tr><td>주가 ≤ MA50 <strong>AND</strong> MA50 > MA200</td><td><span class="tag tag-blue">5점</span></td><td>보통</td></tr>
+                        <tr><td>주가 ≤ MA50 <strong>AND</strong> MA50 ≤ MA200 (3선 역배열)</td><td><span class="tag tag-red">0점</span></td><td>약세</td></tr>
+                    </table>
+
+                    <p style="margin-top:10px;color:#888;font-size:0.85rem;">산출 방식: <code>+5</code> (주가 > MA50) + <code>+5</code> (MA50 > MA200) + <code>+5</code> (3선 정배열 보너스). 데이터 부족 시 0점.</p>
                 </div>
             </div>
         </div>

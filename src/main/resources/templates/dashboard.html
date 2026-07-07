@@ -187,18 +187,6 @@
                         <span class="label">손실 종목</span>
                         <span class="value" th:text="${lossCount} + '종목'">0종목</span>
                     </div>
-                    <form th:action="@{/trade/run}" method="post" class="manual-check">
-                        <button type="submit">수동 분석 실행</button>
-                    </form>
-                    <form th:action="@{/sync/prices}" method="post" class="manual-check">
-                        <button type="submit">가격 동기화</button>
-                    </form>
-                    <form th:action="@{/sync/financials}" method="post" class="manual-check">
-                        <button type="submit">재무제표 동기화</button>
-                    </form>
-                    <form th:action="@{/sync/import-financials}" method="post" class="manual-check">
-                        <button type="submit">재무제표 임포트 (20종목)</button>
-                    </form>
                 </section>
 
                 <div class="content-grid">
@@ -267,6 +255,33 @@
                         </table>
                     </section>
                 </div>
+
+                <section class="manual-actions" style="margin-top: 20px;">
+                    <h2>수동 작업 (개발·운영용)</h2>
+                    <p class="sub-info">정규 분석·매매는 스케줄러가 자동 수행합니다. 아래 버튼은 개발·수동 운영 시 즉시 실행용이며, 각 버튼에 마우스를 올리면 상세 설명이 표시됩니다.</p>
+                    <div class="action-grid">
+                        <form th:action="@{/trade/run}" method="post" class="action-form">
+                            <button type="submit" class="btn btn-primary"
+                                    title="전 종목의 CANSLIM+컵앤핸들 점수를 즉시 재계산해 analysis_scores 테이블에 저장합니다. 실제 매수·매도 주문은 실행하지 않습니다.">수동 분석 실행</button>
+                            <span class="action-desc">전 종목 점수 재계산 · 매매 없음</span>
+                        </form>
+                        <form th:action="@{/sync/prices}" method="post" class="action-form">
+                            <button type="submit" class="btn btn-primary"
+                                    title="최근 7일간의 KRX 일별 시세를 전 활성 종목에 대해 내려받아 stock_prices에 저장합니다.">가격 동기화</button>
+                            <span class="action-desc">최근 7일 KRX 시세 동기화</span>
+                        </form>
+                        <form th:action="@{/sync/financials}" method="post" class="action-form">
+                            <button type="submit" class="btn btn-primary"
+                                    title="DART에서 재무제표(2025년 3분기, 2024년 3·4분기)를 백그라운드로 내려받아 저장합니다. 완료까지 시간이 걸립니다.">재무제표 동기화</button>
+                            <span class="action-desc">DART 재무 동기화 · 백그라운드</span>
+                        </form>
+                        <form th:action="@{/sync/import-financials}" method="post" class="action-form">
+                            <button type="submit" class="btn btn-primary"
+                                    title="서버의 /app/dart_financials.json 파일에서 재무 데이터를 읽어 저장합니다. 종목 수는 파일 내용에 따라 달라지며, 개발·수동 운영용입니다.">재무제표 파일 임포트</button>
+                            <span class="action-desc">서버 JSON 파일에서 재무 임포트</span>
+                        </form>
+                    </div>
+                </section>
 
                 <footer>
                     <p>CAN Agent v0.1.0 - William O'Neil 전략 기반 자동매매 시스템</p>

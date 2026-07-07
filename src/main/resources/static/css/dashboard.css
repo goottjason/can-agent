@@ -234,7 +234,9 @@ header .subtitle {
 .stats {
     display: flex;
     align-items: center;
-    gap: 30px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 24px;
     background: white;
     padding: 15px 20px;
     border-radius: 8px;
@@ -257,22 +259,55 @@ header .subtitle {
     font-weight: bold;
 }
 
-.manual-check {
-    margin-left: auto;
-}
-
-.manual-check button {
-    background: #3498db;
-    color: white;
-    border: none;
+/* ===== 공용 버튼 ===== */
+.btn {
+    display: inline-block;
     padding: 10px 20px;
+    border: none;
     border-radius: 5px;
     cursor: pointer;
     font-size: 0.9rem;
+    text-decoration: none;
+    color: white;
+    background: #3498db;
+    transition: background 0.15s;
 }
 
-.manual-check button:hover {
-    background: #2980b9;
+.btn:hover { background: #2980b9; }
+.btn-primary { background: #3498db; }
+.btn-primary:hover { background: #2980b9; }
+.btn-success { background: #27ae60; }
+.btn-success:hover { background: #229954; }
+.btn-danger { background: #e74c3c; }
+.btn-danger:hover { background: #c0392b; }
+.btn-secondary { background: #7a7a9a; }
+.btn-secondary:hover { background: #5a5a7a; }
+.btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+
+/* ===== 수동 작업 (개발·운영용) ===== */
+.manual-actions .action-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.manual-actions .action-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+}
+
+.manual-actions .action-form .btn {
+    width: 100%;
+}
+
+.manual-actions .action-desc {
+    font-size: 0.75rem;
+    color: #666;
+    text-align: center;
+    line-height: 1.4;
 }
 
 .content-grid {
@@ -618,6 +653,27 @@ footer {
     color: #dc3545;
 }
 
+/* ===== 시스템 소개 문서 카드 (5개 소개 페이지 공통) ===== */
+.doc-card { background: white; padding: 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
+.doc-card h2 { font-size: 1.2rem; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #4fc3f7; display: inline-block; }
+.doc-card h3 { font-size: 1.05rem; color: #333; margin: 18px 0 10px; }
+.doc-card p, .doc-card li { font-size: 0.92rem; color: #444; line-height: 1.7; }
+.doc-card ul { padding-left: 20px; margin: 8px 0; }
+.doc-card li { margin-bottom: 6px; }
+.doc-card code { background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #e74c3c; }
+.doc-card .highlight { background: #e8f4fd; border-left: 4px solid #4fc3f7; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+.doc-card .highlight strong { color: #1a1a2e; }
+.doc-card .warn { background: #fff8e1; border-left: 4px solid #ffb300; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; }
+.doc-card table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.doc-card table th, .doc-card table td { padding: 10px 12px; border: 1px solid #e0e0e0; font-size: 0.88rem; text-align: left; }
+.doc-card table th { background: #f8f9fa; color: #555; font-weight: 600; }
+.doc-card table td { color: #333; }
+.doc-card .tag, .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; margin-right: 4px; }
+.tag-green { background: #d4edda; color: #155724; }
+.tag-red { background: #f8d7da; color: #721c24; }
+.tag-blue { background: #d1ecf1; color: #0c5460; }
+.tag-yellow { background: #fff3cd; color: #856404; }
+
 @media (max-width: 768px) {
     .sidebar {
         position: static;
@@ -643,6 +699,9 @@ footer {
     .stats {
         flex-wrap: wrap;
         gap: 15px;
+    }
+    .manual-actions .action-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
     .heartbeat-metrics {
         grid-template-columns: repeat(2, 1fr);
