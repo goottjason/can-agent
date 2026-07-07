@@ -10,12 +10,14 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Component
 @ConditionalOnProperty(name = "trading.scheduler.enabled", havingValue = "true")
 public class DataSyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DataSyncScheduler.class);
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final KrxDataSyncService krxDataSyncService;
     private final DartDataSyncService dartDataSyncService;
@@ -30,7 +32,7 @@ public class DataSyncScheduler {
     public void syncDailyData() {
         log.info("===== 일일 데이터 동기화 시작 =====");
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         if (isWeekend(today)) {
             log.info("주말은 동기화 스킵");
             return;
@@ -53,7 +55,7 @@ public class DataSyncScheduler {
     public void syncQuarterlyFinancials() {
         log.info("===== 분기 재무제표 동기화 시작 =====");
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         String year = String.valueOf(today.getYear());
         String quarter = getQuarter(today);
 

@@ -106,6 +106,11 @@ public class CanSlimAnalysisService {
                 leader.reason()
         );
 
+        InstitutionalInvestor institutionalResult = new InstitutionalInvestor(
+                institutional.score(),
+                institutional.reason()
+        );
+
         CanSlimResult result = new CanSlimResult(
                 stock.getCode(),
                 stock.getName(),
@@ -115,6 +120,7 @@ public class CanSlimAnalysisService {
                 positionResult,
                 supplyResult,
                 marketResult,
+                institutionalResult,
                 details
         );
 

@@ -367,6 +367,257 @@ footer {
     font-size: 0.85rem;
 }
 
+/* ===== R1 모니터링 하트비트 ===== */
+.monitor-heartbeat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.status-pill::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.status-pill.running {
+    background: #e6f7ec;
+    color: #28a745;
+}
+
+.status-pill.running::before {
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+.status-pill.stale {
+    background: #fff3cd;
+    color: #b8860b;
+}
+
+.status-pill.off-hours {
+    background: #eceef1;
+    color: #6c757d;
+}
+
+.status-pill.error {
+    background: #f8d7da;
+    color: #dc3545;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.heartbeat-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.heartbeat-metric {
+    background: #f8f9fb;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 12px 14px;
+    text-align: center;
+}
+
+.heartbeat-metric .label {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.heartbeat-metric .value {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #1a1a1a;
+}
+
+.heartbeat-metric.warn {
+    background: #fff3cd;
+    border-color: #ffc107;
+}
+
+.heartbeat-metric.warn .value {
+    color: #b8860b;
+}
+
+.poll-error-banner {
+    background: #f8d7da;
+    border: 1px solid #dc3545;
+    color: #721c24;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    font-size: 0.88rem;
+}
+
+.effective-min-score {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.effective-min-score strong {
+    color: #4fc3f7;
+    font-size: 1rem;
+}
+
+/* ===== R2 점수 리더보드 ===== */
+.leaderboard-table th,
+.leaderboard-table td {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.leaderboard-table td.stock-cell {
+    text-align: left;
+}
+
+.leaderboard-table td.total-score {
+    font-weight: bold;
+    font-size: 0.95rem;
+}
+
+.element-cell {
+    color: #999;
+    font-variant-numeric: tabular-nums;
+}
+
+.element-cell.has-score {
+    color: #333;
+    font-weight: 500;
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge.pass {
+    background: #e6f7ec;
+    color: #28a745;
+}
+
+.badge.fail {
+    background: #f8d7da;
+    color: #dc3545;
+}
+
+/* ===== R3 검사 퍼널 ===== */
+.funnel {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.funnel-step {
+    flex: 1;
+    min-width: 110px;
+    background: #f8f9fb;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+    position: relative;
+}
+
+.funnel-step .funnel-count {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #1a1a1a;
+}
+
+.funnel-step .funnel-label {
+    font-size: 0.72rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+.funnel-step.drop .funnel-count {
+    color: #dc3545;
+}
+
+.funnel-step.signal {
+    background: #e6f7ec;
+    border-color: #28a745;
+}
+
+.funnel-step.signal .funnel-count {
+    color: #28a745;
+}
+
+.funnel-step.zero-scan {
+    background: #fff3cd;
+    border-color: #ffc107;
+}
+
+.shortfall-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.shortfall-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 0.85rem;
+}
+
+.shortfall-list .shortfall-reason {
+    color: #666;
+    font-size: 0.8rem;
+}
+
+/* ===== R4 실행 차단 사유 ===== */
+.exec-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.exec-status.ordered {
+    background: #e6f7ec;
+    color: #28a745;
+}
+
+.exec-status.blocked {
+    background: #fff3cd;
+    color: #b8860b;
+}
+
+.exec-status.failed {
+    background: #f8d7da;
+    color: #dc3545;
+}
+
 @media (max-width: 768px) {
     .sidebar {
         position: static;
@@ -392,5 +643,11 @@ footer {
     .stats {
         flex-wrap: wrap;
         gap: 15px;
+    }
+    .heartbeat-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .funnel-step {
+        min-width: calc(50% - 8px);
     }
 }

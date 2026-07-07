@@ -38,7 +38,7 @@ class NotificationServiceRouterTest {
     @DisplayName("활성화된 채널로 알림을 전송한다")
     void sendNotification_enabledChannel_sends() {
         Stock stock = MockDataFactory.createSamsungStock();
-        Trade trade = new Trade(stock, TradeType.BUY, 10, new BigDecimal("70000"), "테스트");
+        Trade trade = new Trade(stock, TradeType.BUY, new BigDecimal("10"), new BigDecimal("70000"), "테스트");
         NotificationEvent event = NotificationEvent.fromTrade(trade);
 
         router.sendNotification(event);
@@ -54,7 +54,7 @@ class NotificationServiceRouterTest {
         NotificationServiceRouter disabledRouter = new NotificationServiceRouter(List.of(disabledService));
 
         Stock stock = MockDataFactory.createSamsungStock();
-        Trade trade = new Trade(stock, TradeType.BUY, 10, new BigDecimal("70000"), "테스트");
+        Trade trade = new Trade(stock, TradeType.BUY, new BigDecimal("10"), new BigDecimal("70000"), "테스트");
         NotificationEvent event = NotificationEvent.fromTrade(trade);
 
         disabledRouter.sendNotification(event);
@@ -82,7 +82,7 @@ class NotificationServiceRouterTest {
                 List.of(failingService, consoleService));
 
         Stock stock = MockDataFactory.createSamsungStock();
-        Trade trade = new Trade(stock, TradeType.BUY, 10, new BigDecimal("70000"), "테스트");
+        Trade trade = new Trade(stock, TradeType.BUY, new BigDecimal("10"), new BigDecimal("70000"), "테스트");
         NotificationEvent event = NotificationEvent.fromTrade(trade);
 
         multiRouter.sendNotification(event);

@@ -11,7 +11,7 @@
         .sub-info { font-size: 0.8rem; color: #666; margin-top: 5px; }
     </style>
 </head>
-<body>
+<body th:attr="data-monitor-status-url=@{/api/monitor/status}">
     <div class="layout">
         <aside class="sidebar" th:replace="~{fragments/_sidebar :: sidebar}"></aside>
 
@@ -53,23 +53,41 @@
                     </div>
                 </div>
 
-                <section class="monitor-section" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                <section class="monitor-section" style="margin-bottom: 20px;">
                     <h2>실시간 모니터링</h2>
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <div class="stat-item">
-                            <span class="label">상태</span>
-                            <span class="value" th:text="${monitorActive} ? '가동 중' : '대기 중'" th:style="${monitorActive} ? 'color: #28a745' : 'color: #6c757d'">대기 중</span>
-                        </div>
-                        <div class="stat-item">
+
+                    <!-- 폴링 실패 시 표시 (조용히 이전 값 유지 금지) -->
+                    <div id="mon-poll-error" class="poll-error-banner" style="display: none;"></div>
+
+                    <div class="monitor-heartbeat">
+                        <!-- 3단계 상태: JS가 backend status(RUNNING/STALE/CLOSED)로 채움. 초기엔 확인 중. -->
+                        <span id="mon-status-pill" class="status-pill off-hours">확인 중...</span>
+                        <span class="effective-min-score">
+                            유효 매수 임계값(min-score): <strong id="mon-min-score">-</strong>
+                        </span>
+                    </div>
+
+                    <div class="heartbeat-metrics">
+                        <div class="heartbeat-metric">
                             <span class="label">마지막 검사</span>
-                            <span class="value" th:text="${monitorLastCheck} ? ${#temporals.format(monitorLastCheck, 'HH:mm:ss')} : '-'">-</span>
+                            <span class="value" id="mon-last-check">-</span>
                         </div>
-                        <div class="stat-item">
-                            <span class="label">매수 신호</span>
-                            <span class="value" th:text="${monitorSignalCount} + '건'">0건</span>
+                        <div class="heartbeat-metric">
+                            <span class="label">다음 검사까지</span>
+                            <span class="value" id="mon-countdown">-</span>
+                        </div>
+                        <div class="heartbeat-metric">
+                            <span class="label">오늘 검사 횟수</span>
+                            <span class="value" id="mon-today-count">-</span>
+                        </div>
+                        <div class="heartbeat-metric" id="mon-scan-metric">
+                            <span class="label">마지막 스캔 종목</span>
+                            <span class="value" id="mon-scan-count">-</span>
                         </div>
                     </div>
-                    <div th:if="${!#lists.isEmpty(monitorSignals)}" style="margin-top: 15px;">
+
+                    <!-- R4 신호 + 실행 결과. JS가 폴링 응답 signals[]로 채움(status=실행 상태). -->
+                    <div id="mon-signals-wrap" style="margin-top: 15px; display: none;">
                         <h3>매수 신호 발생 종목</h3>
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead>
@@ -79,24 +97,53 @@
                                     <th>CANSLIM 점수</th>
                                     <th>컵앤핸들 점수</th>
                                     <th>총점</th>
-                                    <th>사유</th>
+                                    <th>실행 상태</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr th:each="signal : ${monitorSignals}">
-                                    <td>
-                                        <span th:text="${signal.name}">종목명</span>
-                                        <span th:text="'(' + ${signal.code} + ')'">(000000)</span>
-                                    </td>
-                                    <td th:text="${#numbers.formatInteger(signal.price, 1, 'COMMA')} + '원'">0원</td>
-                                    <td th:text="${signal.canSlimScore}">0</td>
-                                    <td th:text="${signal.cupScore}">0</td>
-                                    <td th:text="${signal.totalScore}" style="font-weight: bold;">0</td>
-                                    <td th:text="${signal.reason}" style="font-size: 0.85rem;">사유</td>
-                                </tr>
-                            </tbody>
+                            <tbody id="mon-signals-body"></tbody>
                         </table>
                     </div>
+                    <div id="mon-signals-empty" class="empty-state" style="margin-top: 15px;">발생한 매수 신호가 없습니다.</div>
+                </section>
+
+                <!-- R3 검사 퍼널. JS가 폴링 응답 funnel/nearMiss로 채움. -->
+                <section class="funnel-section" style="margin-bottom: 20px;">
+                    <h2>마지막 검사 퍼널</h2>
+                    <p class="sub-info">스캔 → 단계별 탈락 → 신호 → 주문. 각 단계에서 몇 종목이 왜 걸러졌는지.</p>
+                    <div class="funnel" id="mon-funnel"></div>
+
+                    <h3 style="margin-top: 16px; font-size: 1rem;">상위 미달 종목 부족 요소</h3>
+                    <ul class="shortfall-list" id="mon-near-miss">
+                        <li class="empty-state" style="padding: 20px;">확인 중...</li>
+                    </ul>
+                </section>
+
+                <!-- R2 점수 상위 종목 리더보드. JS가 폴링 응답 leaderboard[]로 채움. -->
+                <section class="leaderboard-section" style="margin-bottom: 20px;">
+                    <h2>오늘의 점수 상위 종목 (Top 20)</h2>
+                    <p class="sub-info">임계값 미달 종목도 포함 — "왜 아무것도 안 잡히는지"를 보기 위함.</p>
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>순위</th>
+                                <th>종목</th>
+                                <th>총점</th>
+                                <th>판정</th>
+                                <th>CANSLIM</th>
+                                <th>컵</th>
+                                <th title="분기실적">C</th>
+                                <th title="연간실적">A</th>
+                                <th title="수급">S</th>
+                                <th title="업종선도">L</th>
+                                <th title="기관">I</th>
+                                <th title="시장방향">M</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mon-leaderboard-body">
+                            <tr><td colspan="12" class="empty-state">확인 중...</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="sub-info" style="margin-top: 10px;">요소 점수 0 = 해당 데이터 부족(예: 전년 동기 실적 미보유 시 C·A 0점).</p>
                 </section>
 
                 <section class="summary">
@@ -227,5 +274,6 @@
             </div>
         </div>
     </div>
+    <script th:src="@{/js/monitor.js}"></script>
 </body>
 </html>

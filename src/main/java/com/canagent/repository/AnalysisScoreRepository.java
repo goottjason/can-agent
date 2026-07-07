@@ -2,6 +2,7 @@ package com.canagent.repository;
 
 import com.canagent.domain.analysis.AnalysisScore;
 import com.canagent.domain.stock.Stock;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,15 @@ public interface AnalysisScoreRepository extends JpaRepository<AnalysisScore, Lo
     List<AnalysisScore> findByAnalysisDate(LocalDate analysisDate);
 
     List<AnalysisScore> findByAnalysisDateAndTotalScoreGreaterThanEqual(LocalDate analysisDate, int minScore);
+
+    // 점수 상위 종목 리더보드(R2). 임계값 미달 종목도 포함하며, Stock을 즉시 로딩한다.
+    @Query("SELECT a FROM AnalysisScore a JOIN FETCH a.stock " +
+            "WHERE a.analysisDate = :analysisDate ORDER BY a.totalScore DESC")
+    List<AnalysisScore> findTopByAnalysisDate(@Param("analysisDate") LocalDate analysisDate, Pageable pageable);
+
+    // 가장 최근 분석일 (야간 배치·장중 UPSERT 모두 반영된 최신 날짜)
+    @Query("SELECT MAX(a.analysisDate) FROM AnalysisScore a")
+    Optional<LocalDate> findLatestAnalysisDate();
 
     @Modifying
     @Transactional

@@ -1,13 +1,16 @@
 package com.canagent.worker;
 
+import com.canagent.domain.analysis.MonitorCheckLog;
 import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.stock.StockPrice;
 import com.canagent.domain.trading.Trade;
 import com.canagent.repository.AnalysisScoreRepository;
+import com.canagent.repository.MonitorCheckLogRepository;
 import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.canagent.service.KoreaInvestmentApiClient;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
@@ -50,6 +53,8 @@ public class IntradayMonitorWorker {
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
     private final TradingStrategyService tradingStrategyService;
     private final NotificationServiceRouter notificationServiceRouter;
+    private final MonitorCheckLogRepository monitorCheckLogRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${trading.max-positions:10}")
     private int maxPositions;
@@ -63,6 +68,7 @@ public class IntradayMonitorWorker {
     private volatile boolean monitoring = false;
     private volatile LocalDateTime lastCheckTime;
     private volatile int lastSignalCount;
+    private volatile int lastScanCount;
     private volatile List<Map<String, Object>> lastSignals = Collections.emptyList();
 
     public IntradayMonitorWorker(
@@ -74,7 +80,9 @@ public class IntradayMonitorWorker {
             CanSlimAnalysisService canSlimAnalysisService,
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
             TradingStrategyService tradingStrategyService,
-            NotificationServiceRouter notificationServiceRouter) {
+            NotificationServiceRouter notificationServiceRouter,
+            MonitorCheckLogRepository monitorCheckLogRepository,
+            ObjectMapper objectMapper) {
         this.stockRepository = stockRepository;
         this.stockPriceRepository = stockPriceRepository;
         this.portfolioRepository = portfolioRepository;
@@ -84,6 +92,8 @@ public class IntradayMonitorWorker {
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
         this.tradingStrategyService = tradingStrategyService;
         this.notificationServiceRouter = notificationServiceRouter;
+        this.monitorCheckLogRepository = monitorCheckLogRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Scheduled(cron = "${trading.scheduler.monitor-cron:0 */5 9-15 * * MON-FRI}", zone = "Asia/Seoul")
@@ -98,19 +108,22 @@ public class IntradayMonitorWorker {
         monitoring = true;
         lastCheckTime = now;
 
+        CheckFunnel funnel = new CheckFunnel(minScore);
         try {
             // 1단계: 보유 종목 매도 체크 (≤10개, ~5초)
             checkHeldPositionsForSell(now);
 
             // 2단계: 매수 대상 스캔 (~400종목)
             List<Stock> targetStocks = getTargetStocks();
+            funnel.scanned = targetStocks.size();
+            lastScanCount = targetStocks.size();
             log.info("대상 종목 수: {}", targetStocks.size());
 
             List<SignalStock> signalStocks = new ArrayList<>();
 
             for (Stock stock : targetStocks) {
                 try {
-                    processStockForSignal(stock, signalStocks);
+                    processStockForSignal(stock, signalStocks, funnel);
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -120,39 +133,67 @@ public class IntradayMonitorWorker {
                 }
             }
 
+            funnel.signalCount = signalStocks.size();
+
             // 3단계: 매수 주문 실행
             LocalDateTime checkTime = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
             if (!signalStocks.isEmpty() && isTradingHours(checkTime)) {
-                executeBuyOrders(signalStocks);
+                executeBuyOrders(signalStocks, funnel);
             } else if (!signalStocks.isEmpty()) {
                 log.info("장 마감으로 매수 건너뜀: {}건", signalStocks.size());
+                for (SignalStock s : signalStocks) {
+                    funnel.recordExecution(s, "MARKET_CLOSED", "장 마감으로 주문 건너뜀");
+                }
             }
 
             lastSignalCount = signalStocks.size();
             lastSignals = signalStocks.stream()
-                    .map(s -> Map.<String, Object>of(
-                            "code", s.stock.getCode(),
-                            "name", s.stock.getName(),
-                            "price", s.currentPrice,
-                            "canSlimScore", s.canSlimResult.totalScore(),
-                            "cupScore", s.cupResult.score(),
-                            "totalScore", s.totalScore,
-                            "reason", s.reason
-                    ))
+                    .map(s -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("code", s.stock.getCode());
+                        m.put("name", s.stock.getName());
+                        m.put("price", s.currentPrice);
+                        m.put("canSlimScore", s.canSlimResult.totalScore());
+                        m.put("cupScore", s.cupResult.score());
+                        m.put("totalScore", s.totalScore);
+                        m.put("reason", s.reason);
+                        CheckFunnel.ExecutionResult er = funnel.executionByCode.get(s.stock.getCode());
+                        m.put("executionStatus", er != null ? er.status() : "PENDING");
+                        m.put("executionDetail", er != null ? er.detail() : "");
+                        return m;
+                    })
                     .collect(Collectors.toList());
 
-            log.info("장중 모니터링 완료: 매수 신호 {}건 발견", signalStocks.size());
+            log.info("장중 모니터링 완료: 스캔 {} / 현재가실패 {} / 보유중 {} / 신호미달 {} / 총점미달 {} / 신호 {} / 주문성공 {} / 차단 {}",
+                    funnel.scanned, funnel.priceFail, funnel.heldSkip, funnel.signalMiss,
+                    funnel.scoreMiss, funnel.signalCount, funnel.orderSuccess, funnel.orderBlocked);
         } catch (Exception e) {
             log.error("장중 모니터링 실패: {}", e.getMessage());
         } finally {
             monitoring = false;
+            persistCheckLog(now, funnel);
+        }
+    }
+
+    private void persistCheckLog(LocalDateTime checkTime, CheckFunnel funnel) {
+        try {
+            String nearMissJson = objectMapper.writeValueAsString(funnel.topNearMiss(10));
+            String executionJson = objectMapper.writeValueAsString(new ArrayList<>(funnel.executionByCode.values()));
+            monitorCheckLogRepository.save(new MonitorCheckLog(
+                    checkTime, funnel.scanned, funnel.priceFail, funnel.heldSkip,
+                    funnel.signalMiss, funnel.scoreMiss, funnel.signalCount,
+                    funnel.orderSuccess, funnel.orderBlocked, funnel.minScore,
+                    nearMissJson, executionJson));
+        } catch (Exception e) {
+            log.error("모니터링 검사 로그 저장 실패: {}", e.getMessage());
         }
     }
 
     // ========== 1단계: 보유 종목 매도 체크 ==========
 
     private void checkHeldPositionsForSell(LocalDateTime now) {
-        List<Portfolio> heldPositions = portfolioRepository.findByActiveTrue();
+        // JOIN FETCH로 Stock 즉시 로딩 — @Scheduled 스레드(세션 없음)에서 portfolio.getStock() 접근 안전
+        List<Portfolio> heldPositions = portfolioRepository.findActiveWithStock();
         if (heldPositions.isEmpty()) {
             return;
         }
@@ -231,10 +272,18 @@ public class IntradayMonitorWorker {
     // ========== 2단계: 매수 대상 스캔 ==========
 
     private List<Stock> getTargetStocks() {
-        LocalDate yesterday = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(1);
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        // 하드 "어제" 대신 stock_prices 내 최신 완료 거래일(오늘 미만)을 기준으로 — 동기화 지연·휴장일에 견고.
+        // 오늘 날짜는 장중 미완성 데이터이므로 제외한다.
+        LocalDate baseDate = stockPriceRepository.findLatestTradeDateBefore(today).orElse(null);
+        if (baseDate == null) {
+            log.warn("기준 거래일 데이터 없음 (오늘 {} 이전 stock_prices 없음) - 대상 종목 0", today);
+            return Collections.emptyList();
+        }
 
-        List<StockPrice> topVolume = stockPriceRepository.findTopByVolumeOnDate(yesterday, 200);
-        List<StockPrice> topChange = stockPriceRepository.findTopByChangeRateOnDate(yesterday, 200);
+        org.springframework.data.domain.Pageable top200 = org.springframework.data.domain.PageRequest.of(0, 200);
+        List<StockPrice> topVolume = stockPriceRepository.findTopByVolumeOnDate(baseDate, top200);
+        List<StockPrice> topChange = stockPriceRepository.findTopByChangeRateOnDate(baseDate, top200);
 
         Map<Long, Stock> stockMap = new LinkedHashMap<>();
         for (StockPrice sp : topVolume) {
@@ -245,8 +294,8 @@ public class IntradayMonitorWorker {
         }
 
         List<Stock> result = new ArrayList<>(stockMap.values());
-        log.info("필터링된 대상 종목: 거래량 상위 {} + 변동률 상위 {} = 중복 제거 후 {}개",
-                topVolume.size(), topChange.size(), result.size());
+        log.info("필터링된 대상 종목(기준일 {}): 거래량 상위 {} + 변동률 상위 {} = 중복 제거 후 {}개",
+                baseDate, topVolume.size(), topChange.size(), result.size());
         return result;
     }
 
@@ -265,14 +314,16 @@ public class IntradayMonitorWorker {
         return !time.isBefore(marketOpen) && !time.isAfter(marketClose);
     }
 
-    private void processStockForSignal(Stock stock, List<SignalStock> signalStocks) {
+    private void processStockForSignal(Stock stock, List<SignalStock> signalStocks, CheckFunnel funnel) {
         KoreaInvestmentPriceResponse priceResponse = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
         if (priceResponse == null || !priceResponse.isSuccess()) {
+            funnel.priceFail++;
             return;
         }
 
         int currentPriceInt = priceResponse.getCurrentPrice();
         if (currentPriceInt <= 0) {
+            funnel.priceFail++;
             return;
         }
 
@@ -284,6 +335,7 @@ public class IntradayMonitorWorker {
         Optional<Portfolio> existingPosition =
                 portfolioRepository.findByStockIdAndActiveTrue(stock.getId());
         if (existingPosition.isPresent()) {
+            funnel.heldSkip++;
             return;
         }
 
@@ -302,7 +354,7 @@ public class IntradayMonitorWorker {
                 canSlimResult.supplyDemand() != null ? canSlimResult.supplyDemand().score().intValue() : 0,
                 canSlimResult.marketDirection() != null ? canSlimResult.marketDirection().score().intValue() : 0,
                 canSlimResult.marketPosition() != null ? canSlimResult.marketPosition().score().intValue() : 0,
-                0,
+                canSlimResult.institutionalInvestor() != null ? canSlimResult.institutionalInvestor().score().intValue() : 0,
                 cupResult.score() != null ? cupResult.score().intValue() : 0,
                 cupResult.patternType() != null ? cupResult.patternType().name() : "NO_PATTERN",
                 canSlimResult.totalScore().add(cupResult.score() != null ? cupResult.score() : BigDecimal.ZERO).intValue()
@@ -311,12 +363,19 @@ public class IntradayMonitorWorker {
         boolean canSlimBuy = canSlimResult.isBuySignal();
         boolean cupBuy = cupResult.isBuySignal();
 
+        BigDecimal totalScore = canSlimResult.totalScore().add(cupResult.score());
+
         if (!canSlimBuy && !cupBuy) {
+            funnel.signalMiss++;
+            funnel.recordNearMiss(stock, currentPrice, canSlimResult, cupResult, totalScore, "SIGNAL_MISS",
+                    String.format("매수 신호 없음 (CANSLIM %s<40, 컵 패턴 없음)", canSlimResult.totalScore()));
             return;
         }
 
-        BigDecimal totalScore = canSlimResult.totalScore().add(cupResult.score());
         if (totalScore.compareTo(new BigDecimal(String.valueOf(minScore))) < 0) {
+            funnel.scoreMiss++;
+            funnel.recordNearMiss(stock, currentPrice, canSlimResult, cupResult, totalScore, "SCORE_MISS",
+                    String.format("총점 %s < %d", totalScore, minScore));
             return;
         }
 
@@ -329,7 +388,7 @@ public class IntradayMonitorWorker {
             KoreaInvestmentPriceResponse.PriceOutput output = response.getOutput();
             StockPrice stockPrice = new StockPrice(
                     stock,
-                    LocalDate.now(),
+                    LocalDate.now(java.time.ZoneId.of("Asia/Seoul")),
                     output != null ? parseBigDecimal(output.getOpeningPrice()) : currentPrice,
                     output != null ? parseBigDecimal(output.getHighPrice()) : currentPrice,
                     output != null ? parseBigDecimal(output.getLowPrice()) : currentPrice,
@@ -361,23 +420,32 @@ public class IntradayMonitorWorker {
 
     // ========== 3단계: 매수 주문 실행 ==========
 
-    private void executeBuyOrders(List<SignalStock> signalStocks) {
+    private void executeBuyOrders(List<SignalStock> signalStocks, CheckFunnel funnel) {
         long activePositions = portfolioRepository.findByActiveTrue().size();
         int availableSlots = maxPositions - (int) activePositions;
 
         if (availableSlots <= 0) {
             log.info("최대 보유 종목 수 도달: {}", maxPositions);
+            for (SignalStock s : signalStocks) {
+                funnel.recordExecution(s, "LIMIT_REACHED", "최대 보유 종목 수 도달: " + maxPositions);
+            }
             return;
         }
 
         KoreaInvestmentBalanceResponse balance = getBalance();
         if (balance == null) {
+            for (SignalStock s : signalStocks) {
+                funnel.recordExecution(s, "BALANCE_FAIL", "잔고 조회 실패");
+            }
             return;
         }
 
         BigDecimal availableCash = parseBigDecimal(balance.getOutput2().get(0).getWithdrawableAmount());
         if (availableCash.compareTo(BigDecimal.ZERO) <= 0) {
             log.info("예수금 부족: {}원", availableCash);
+            for (SignalStock s : signalStocks) {
+                funnel.recordExecution(s, "INSUFFICIENT_CASH", "예수금 부족: " + availableCash + "원");
+            }
             return;
         }
 
@@ -385,6 +453,13 @@ public class IntradayMonitorWorker {
                 .sorted(Comparator.comparing((SignalStock s) -> s.totalScore).reversed())
                 .limit(availableSlots)
                 .collect(Collectors.toList());
+
+        // 슬롯 초과로 이번 검사에서 제외된 신호는 한도 도달로 기록
+        for (SignalStock s : signalStocks) {
+            if (!sortedSignals.contains(s)) {
+                funnel.recordExecution(s, "LIMIT_REACHED", "가용 슬롯(" + availableSlots + ") 초과");
+            }
+        }
 
         BigDecimal totalScore = sortedSignals.stream()
                 .map(s -> s.totalScore)
@@ -398,6 +473,7 @@ public class IntradayMonitorWorker {
 
                 if (investAmount.compareTo(new BigDecimal("5000")) < 0) {
                     log.info("최소 주문금액 미달: {} ({}) - {}원", signal.stock.getName(), signal.stock.getCode(), investAmount);
+                    funnel.recordExecution(signal, "MIN_AMOUNT", "최소 주문금액 미달: " + investAmount + "원");
                     continue;
                 }
 
@@ -405,6 +481,7 @@ public class IntradayMonitorWorker {
 
                 if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
                     log.info("매수 수량 0: {} ({})", signal.stock.getName(), signal.stock.getCode());
+                    funnel.recordExecution(signal, "MIN_AMOUNT", "매수 수량 0 (배분 " + investAmount + "원)");
                     continue;
                 }
 
@@ -434,12 +511,17 @@ public class IntradayMonitorWorker {
 
                 if (trade != null) {
                     notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
+                    funnel.recordExecution(signal, "ORDER_SUCCESS",
+                            String.format("%s주 @ %s원 (배분 %s원)", quantity, signal.currentPrice, investAmount));
+                } else {
+                    funnel.recordExecution(signal, "ORDER_FAILED", "주문 결과 없음(수량 0 또는 시뮬레이션)");
                 }
 
                 availableCash = availableCash.subtract(investAmount);
                 Thread.sleep(1000);
             } catch (Exception e) {
                 log.error("매수 실행 실패: {} ({}) - {}", signal.stock.getName(), signal.stock.getCode(), e.getMessage());
+                funnel.recordExecution(signal, "ORDER_FAILED", "주문 실패: " + e.getMessage());
             }
         }
     }
@@ -459,6 +541,8 @@ public class IntradayMonitorWorker {
     public boolean isMonitoring() { return monitoring; }
     public LocalDateTime getLastCheckTime() { return lastCheckTime; }
     public int getLastSignalCount() { return lastSignalCount; }
+    public int getLastScanCount() { return lastScanCount; }
+    public int getMinScore() { return minScore; }
     public List<Map<String, Object>> getLastSignals() { return lastSignals; }
 
     private BigDecimal parseBigDecimal(String value) {
@@ -487,4 +571,68 @@ public class IntradayMonitorWorker {
             BigDecimal totalScore,
             String reason
     ) {}
+
+    /**
+     * 1회 검사의 퍼널 카운터와 탈락/실행 사유를 누적한다.
+     * 요소별 분해는 analysis_scores 저장 매핑과 동일하게 맞춘다
+     * (institutional은 현재 영속화 경로에서 0으로 저장됨 — upsertScore와 일치).
+     */
+    private static final class CheckFunnel {
+        final int minScore;
+        int scanned, priceFail, heldSkip, signalMiss, scoreMiss, signalCount, orderSuccess, orderBlocked;
+        final List<NearMiss> nearMisses = new ArrayList<>();
+        final Map<String, ExecutionResult> executionByCode = new LinkedHashMap<>();
+
+        CheckFunnel(int minScore) { this.minScore = minScore; }
+
+        void recordNearMiss(Stock stock, BigDecimal price, CanSlimResult cs, CupAndHandleResult cup,
+                            BigDecimal total, String stage, String reason) {
+            nearMisses.add(new NearMiss(
+                    stock.getCode(),
+                    stock.getName(),
+                    total.intValue(),
+                    cs.totalScore().intValue(),
+                    cup.score() != null ? cup.score().intValue() : 0,
+                    cs.currentQuarterEarnings() != null ? cs.currentQuarterEarnings().score().intValue() : 0,
+                    cs.annualEarnings() != null ? cs.annualEarnings().score().intValue() : 0,
+                    cs.supplyDemand() != null ? cs.supplyDemand().score().intValue() : 0,
+                    cs.marketDirection() != null ? cs.marketDirection().score().intValue() : 0,
+                    cs.marketPosition() != null ? cs.marketPosition().score().intValue() : 0,
+                    cs.institutionalInvestor() != null ? cs.institutionalInvestor().score().intValue() : 0,
+                    stage,
+                    reason));
+        }
+
+        List<NearMiss> topNearMiss(int n) {
+            return nearMisses.stream()
+                    .sorted(Comparator.comparingInt(NearMiss::totalScore).reversed())
+                    .limit(n)
+                    .collect(Collectors.toList());
+        }
+
+        void recordExecution(SignalStock s, String status, String detail) {
+            executionByCode.put(s.stock.getCode(), new ExecutionResult(
+                    s.stock.getCode(),
+                    s.stock.getName(),
+                    s.currentPrice.intValue(),
+                    s.canSlimResult.totalScore().intValue(),
+                    s.cupResult.score() != null ? s.cupResult.score().intValue() : 0,
+                    s.totalScore.intValue(),
+                    s.reason,
+                    status,
+                    detail));
+            if ("ORDER_SUCCESS".equals(status)) {
+                orderSuccess++;
+            } else {
+                orderBlocked++;
+            }
+        }
+
+        record NearMiss(String code, String name, int totalScore, int canSlimScore, int cupScore,
+                        int quarterly, int annual, int supplyDemand, int marketDirection,
+                        int industryLeader, int institutional, String stage, String reason) {}
+
+        record ExecutionResult(String code, String name, int price, int canSlimScore, int cupScore,
+                               int totalScore, String reason, String status, String detail) {}
+    }
 }

@@ -25,7 +25,8 @@ public class StockController {
     private final DataSyncScheduler dataSyncScheduler;
 
     @Autowired
-    public StockController(StockService stockService, DataSyncScheduler dataSyncScheduler) {
+    public StockController(StockService stockService,
+                           @Autowired(required = false) DataSyncScheduler dataSyncScheduler) {
         this.stockService = stockService;
         this.dataSyncScheduler = dataSyncScheduler;
     }

@@ -47,7 +47,9 @@ public class TradingStrategyService {
     @Value("${trading.take-profit-rate:20}")
     private BigDecimal takeProfitRate;
 
-    @Value("${trading.min-score:60}")
+    // 매수 최소 총점. 유효값은 application.yml의 trading.min-score(=120)에서 오며,
+    // 워커 경로와 동일한 기본값(120)으로 통일한다. (R5 — 60/120 불일치 제거)
+    @Value("${trading.min-score:120}")
     private int minScore;
 
     @Value("${trading.real-trading:false}")

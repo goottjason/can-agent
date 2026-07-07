@@ -101,7 +101,7 @@ class KoreaInvestmentApiClientTest {
         response.setMsg1("조회 성공");
 
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
-                eq(KoreaInvestmentBalanceResponse.class), anyMap()))
+                eq(KoreaInvestmentBalanceResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
         // when
@@ -123,7 +123,7 @@ class KoreaInvestmentApiClientTest {
         response.setOutput(output);
 
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
-                eq(KoreaInvestmentPriceResponse.class), anyMap()))
+                eq(KoreaInvestmentPriceResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
         // when

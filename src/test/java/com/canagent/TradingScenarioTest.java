@@ -8,6 +8,7 @@ import com.canagent.domain.trading.TradeType;
 import com.canagent.repository.*;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
+import com.canagent.service.KoreaInvestmentApiClient;
 import com.canagent.service.analysis.CanSlimAnalysisService;
 import com.canagent.service.analysis.CupAndHandleAnalyzer;
 import com.canagent.service.dto.CanSlimResult;
@@ -56,12 +57,20 @@ class TradingScenarioTest {
     @MockBean
     private CupAndHandleAnalyzer cupAndHandleAnalyzer;
 
+    @MockBean
+    private KoreaInvestmentApiClient koreaInvestmentApiClient;
+
     private Stock testStock;
 
     @BeforeEach
     void setUp() {
         testStock = MockDataFactory.createSamsungStock();
         stockRepository.save(testStock);
+
+        // 실외부 API 격리: 잔고 조회는 충분한 예수금을 가진 성공 응답으로 스텁
+        org.mockito.Mockito.lenient()
+                .when(koreaInvestmentApiClient.getBalance())
+                .thenReturn(MockDataFactory.createBalanceResponse("100000000"));
     }
 
     @Test
@@ -84,7 +93,7 @@ class TradingScenarioTest {
 
         Optional<Portfolio> portfolio = portfolioRepository.findByStockIdAndActiveTrue(testStock.getId());
         assertThat(portfolio).isPresent();
-        assertThat(portfolio.get().getQuantity()).isGreaterThan(0);
+        assertThat(portfolio.get().getQuantity()).isGreaterThan(BigDecimal.ZERO);
 
         StockPrice sellPrice = MockDataFactory.createRisingPrice(
                 testStock, LocalDate.now(), new BigDecimal("85000"));
@@ -186,6 +195,7 @@ class TradingScenarioTest {
                 new CanSlimResult.MarketPosition(new BigDecimal("15"), true, "1위", "선도주"),
                 new CanSlimResult.SupplyDemand(new BigDecimal("15"), BigDecimal.TEN, BigDecimal.TEN, new BigDecimal("2"), "증가"),
                 new CanSlimResult.MarketDirection(new BigDecimal("15"), "강세", "강세"),
+                new CanSlimResult.InstitutionalInvestor(new BigDecimal("15"), "매집"),
                 java.util.Map.of()
         );
     }
@@ -198,6 +208,7 @@ class TradingScenarioTest {
                 new CanSlimResult.MarketPosition(new BigDecimal("12"), true, "2위", "선도주"),
                 new CanSlimResult.SupplyDemand(new BigDecimal("10"), BigDecimal.TEN, BigDecimal.TEN, new BigDecimal("1"), "보통"),
                 new CanSlimResult.MarketDirection(new BigDecimal("10"), "보통", "보통"),
+                new CanSlimResult.InstitutionalInvestor(new BigDecimal("9"), "매집"),
                 java.util.Map.of()
         );
     }
@@ -210,6 +221,7 @@ class TradingScenarioTest {
                 new CanSlimResult.MarketPosition(BigDecimal.ZERO, false, "N/A", "비선도주"),
                 new CanSlimResult.SupplyDemand(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, "감소"),
                 new CanSlimResult.MarketDirection(BigDecimal.ZERO, "약세", "약세"),
+                new CanSlimResult.InstitutionalInvestor(BigDecimal.ZERO, "분산"),
                 java.util.Map.of()
         );
     }

@@ -79,7 +79,7 @@ public class AutoTradingWorker {
                 canSlimResult.supplyDemand() != null ? canSlimResult.supplyDemand().score().intValue() : 0,
                 canSlimResult.marketDirection() != null ? canSlimResult.marketDirection().score().intValue() : 0,
                 canSlimResult.marketPosition() != null ? canSlimResult.marketPosition().score().intValue() : 0,
-                0,
+                canSlimResult.institutionalInvestor() != null ? canSlimResult.institutionalInvestor().score().intValue() : 0,
                 cupResult.score() != null ? cupResult.score().intValue() : 0,
                 cupResult.patternType() != null ? cupResult.patternType().name() : "NO_PATTERN",
                 canSlimResult.totalScore().add(cupResult.score() != null ? cupResult.score() : BigDecimal.ZERO).intValue()

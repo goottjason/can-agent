@@ -13,6 +13,7 @@ public record CanSlimResult(
         MarketPosition marketPosition,
         SupplyDemand supplyDemand,
         MarketDirection marketDirection,
+        InstitutionalInvestor institutionalInvestor,
 
         Map<String, String> details
 ) {
@@ -51,6 +52,11 @@ public record CanSlimResult(
     public record MarketDirection(
             BigDecimal score,
             String marketTrend,
+            String reason
+    ) {}
+
+    public record InstitutionalInvestor(
+            BigDecimal score,
             String reason
     ) {}
 

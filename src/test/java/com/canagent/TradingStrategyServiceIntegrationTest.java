@@ -8,6 +8,7 @@ import com.canagent.domain.trading.TradeType;
 import com.canagent.repository.*;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
+import com.canagent.service.KoreaInvestmentApiClient;
 import com.canagent.service.analysis.CanSlimAnalysisService;
 import com.canagent.service.analysis.CupAndHandleAnalyzer;
 import com.canagent.service.dto.CanSlimResult;
@@ -57,6 +58,9 @@ class TradingStrategyServiceIntegrationTest {
     @MockBean
     private CupAndHandleAnalyzer cupAndHandleAnalyzer;
 
+    @MockBean
+    private KoreaInvestmentApiClient koreaInvestmentApiClient;
+
     private Stock testStock;
 
     @BeforeEach
@@ -67,6 +71,11 @@ class TradingStrategyServiceIntegrationTest {
         StockPrice price = MockDataFactory.createRisingPrice(
                 testStock, LocalDate.now(), new BigDecimal("75000"));
         stockPriceRepository.save(price);
+
+        // 실외부 API 격리: 잔고 조회는 충분한 예수금을 가진 성공 응답으로 스텁
+        org.mockito.Mockito.lenient()
+                .when(koreaInvestmentApiClient.getBalance())
+                .thenReturn(MockDataFactory.createBalanceResponse("100000000"));
     }
 
     @Test
@@ -82,7 +91,7 @@ class TradingStrategyServiceIntegrationTest {
         TradingDecision decision = tradingStrategyService.evaluateBuy(testStock, latestPrice.getClose());
 
         assertThat(decision.shouldBuy()).isTrue();
-        assertThat(decision.quantity()).isGreaterThan(0);
+        assertThat(decision.quantity()).isGreaterThan(BigDecimal.ZERO);
     }
 
     @Test
@@ -123,7 +132,7 @@ class TradingStrategyServiceIntegrationTest {
     @Test
     @DisplayName("매수 실행 시 포트폴리오가 생성된다")
     void executeBuy_createsPortfolio() {
-        int quantity = 10;
+        BigDecimal quantity = new BigDecimal("10");
         BigDecimal price = new BigDecimal("75000");
 
         Trade trade = tradingStrategyService.executeBuy(testStock, quantity, price, "테스트 매수");
@@ -133,7 +142,7 @@ class TradingStrategyServiceIntegrationTest {
 
         Optional<Portfolio> portfolio = portfolioRepository.findByStockIdAndActiveTrue(testStock.getId());
         assertThat(portfolio).isPresent();
-        assertThat(portfolio.get().getQuantity()).isEqualTo(quantity);
+        assertThat(portfolio.get().getQuantity()).isEqualByComparingTo(quantity);
     }
 
     @Test
@@ -142,7 +151,7 @@ class TradingStrategyServiceIntegrationTest {
         Portfolio portfolio = MockDataFactory.createPortfolio(testStock, 10, new BigDecimal("75000"));
         portfolioRepository.save(portfolio);
 
-        int sellQuantity = 5;
+        BigDecimal sellQuantity = new BigDecimal("5");
         BigDecimal sellPrice = new BigDecimal("80000");
 
         Trade trade = tradingStrategyService.executeSell(testStock, sellQuantity, sellPrice, "테스트 매도");
@@ -152,7 +161,7 @@ class TradingStrategyServiceIntegrationTest {
 
         Optional<Portfolio> updatedPortfolio = portfolioRepository.findByStockIdAndActiveTrue(testStock.getId());
         assertThat(updatedPortfolio).isPresent();
-        assertThat(updatedPortfolio.get().getQuantity()).isEqualTo(5);
+        assertThat(updatedPortfolio.get().getQuantity()).isEqualByComparingTo(new BigDecimal("5"));
     }
 
     private CanSlimResult createHighScoreCanSlimResult() {
@@ -165,6 +174,7 @@ class TradingStrategyServiceIntegrationTest {
                 new CanSlimResult.MarketPosition(BigDecimal.TEN, true, "1위", "선도주"),
                 new CanSlimResult.SupplyDemand(BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN, BigDecimal.ONE, "증가"),
                 new CanSlimResult.MarketDirection(BigDecimal.TEN, "강세", "강세"),
+                new CanSlimResult.InstitutionalInvestor(BigDecimal.TEN, "매집"),
                 java.util.Map.of()
         );
     }
@@ -179,6 +189,7 @@ class TradingStrategyServiceIntegrationTest {
                 new CanSlimResult.MarketPosition(BigDecimal.ZERO, false, "N/A", "비선도주"),
                 new CanSlimResult.SupplyDemand(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, "감소"),
                 new CanSlimResult.MarketDirection(BigDecimal.ZERO, "약세", "약세"),
+                new CanSlimResult.InstitutionalInvestor(BigDecimal.ZERO, "분산"),
                 java.util.Map.of()
         );
     }

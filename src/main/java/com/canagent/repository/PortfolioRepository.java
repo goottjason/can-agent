@@ -16,6 +16,10 @@ public interface PortfolioRepository extends JpaRepository<Portfolio, Long> {
 
     List<Portfolio> findByActiveTrue();
 
+    // Stock을 즉시 로딩 — @Scheduled(세션 없음) 매도 체크 경로의 LazyInitializationException 방지
+    @Query("SELECT p FROM Portfolio p JOIN FETCH p.stock WHERE p.active = true")
+    List<Portfolio> findActiveWithStock();
+
     Optional<Portfolio> findByStockIdAndActiveTrue(Long stockId);
 
     long countByActiveTrue();
