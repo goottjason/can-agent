@@ -129,20 +129,19 @@ class KrxDataSyncServiceTest {
     @Test
     @DisplayName("전체 활성 종목 동기화")
     void syncAllActiveStocks_multipleStocks_syncsAll() {
-        // given
+        // given — syncAllActiveStocks는 종목별 조회가 아니라 날짜별 전종목 배치(getAllDailyPrices) 사용.
         Stock stock2 = MockDataFactory.createNaverStock();
         when(stockRepository.findByActiveTrue()).thenReturn(List.of(stock, stock2));
-        when(stockRepository.findByCode("005930")).thenReturn(Optional.of(stock));
-        when(stockRepository.findByCode("035420")).thenReturn(Optional.of(stock2));
-        when(krxApiClient.getDailyPrices(anyString(), anyString(), anyString()))
+        when(krxApiClient.getAllDailyPrices(anyString()))
                 .thenReturn(Collections.emptyList());
 
-        // when
+        // when — 단일 거래일 조회 → 배치 1회 호출
         int totalSaved = krxDataSyncService.syncAllActiveStocks(
                 LocalDate.of(2024, 1, 15), LocalDate.of(2024, 1, 15));
 
         // then
         assertThat(totalSaved).isEqualTo(0);
-        verify(krxApiClient, times(2)).getDailyPrices(anyString(), anyString(), anyString());
+        verify(krxApiClient, times(1)).getAllDailyPrices(anyString());
+        verify(krxApiClient, never()).getDailyPrices(anyString(), anyString(), anyString());
     }
 }

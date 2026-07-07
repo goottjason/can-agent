@@ -104,28 +104,30 @@ class CanSlimAnalysisServiceTest {
     @Test
     @DisplayName("부분적으로 높은 점수를 받으면 일반 매수 신호를 리턴한다")
     void analyze_mixedScores_returnsNormalBuySignal() {
+        // 합계 54점: 일반 매수(isBuySignal ≥40) 성립하되 강력 매수(isStrongBuy ≥60) 미달.
+        // 14 + 14 + 10 + 8 + 4 + 4 = 54
         when(quarterlyEarningsAnalyzer.analyze(any()))
                 .thenReturn(new QuarterlyEarningsAnalyzer.CanSlimElement(
-                        new BigDecimal("16"), "성장"));
+                        new BigDecimal("14"), "성장"));
         when(annualEarningsAnalyzer.analyze(any()))
                 .thenReturn(new AnnualEarningsAnalyzer.CanSlimElement(
-                        new BigDecimal("16"), "성장"));
+                        new BigDecimal("14"), "성장"));
         when(supplyDemandAnalyzer.analyze(any()))
                 .thenReturn(new SupplyDemandAnalyzer.CanSlimElement(
-                        new BigDecimal("12"), "보통"));
+                        new BigDecimal("10"), "보통"));
         when(marketDirectionAnalyzer.analyze(any()))
                 .thenReturn(new MarketDirectionAnalyzer.CanSlimElement(
-                        new BigDecimal("10"), "보통"));
+                        new BigDecimal("8"), "보통"));
         when(industryLeaderAnalyzer.analyze(any()))
                 .thenReturn(new IndustryLeaderAnalyzer.CanSlimElement(
-                        new BigDecimal("9"), "중간"));
+                        new BigDecimal("4"), "중간"));
         when(institutionalInvestorAnalyzer.analyze(any()))
                 .thenReturn(new InstitutionalInvestorAnalyzer.CanSlimElement(
-                        new BigDecimal("9"), "보통"));
+                        new BigDecimal("4"), "보통"));
 
         CanSlimResult result = analysisService.analyze(stock);
 
-        assertThat(result.totalScore()).isEqualByComparingTo(new BigDecimal("72"));
+        assertThat(result.totalScore()).isEqualByComparingTo(new BigDecimal("54"));
         assertThat(result.isBuySignal()).isTrue();
         assertThat(result.isStrongBuy()).isFalse();
     }
