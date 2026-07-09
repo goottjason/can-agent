@@ -40,6 +40,12 @@ api:
     account-number: ${KOREA_INVESTMENT_ACCOUNT_NUMBER:}
     is-real: ${KOREA_INVESTMENT_IS_REAL:false}
 
+# SEC EDGAR (P4: 미국 재무 데이터). User-Agent 필수(SEC 정책) — 운영에선 실제 연락처로 override 권장.
+edgar:
+  user-agent: "${EDGAR_USER_AGENT:CAN-Agent/1.0 (admin@canagent.local)}"
+  base-url: "${EDGAR_BASE_URL:https://data.sec.gov}"
+  min-interval-ms: 125
+
 # 자동매매 스케줄
 trading:
   scheduler:

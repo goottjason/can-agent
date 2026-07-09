@@ -1,6 +1,7 @@
 package com.canagent.service.analysis;
 
 import com.canagent.domain.stock.FinancialStatement;
+import com.canagent.domain.stock.FiscalPeriodType;
 import com.canagent.domain.stock.Stock;
 import com.canagent.repository.FinancialStatementRepository;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,15 @@ public class AnnualEarningsAnalyzer {
             return new CanSlimElement(BigDecimal.ZERO, "재무제표 데이터 부족");
         }
 
-        FinancialStatement currentYear = statements.get(0);
+        FinancialStatement currentYear = statements.stream()
+                .filter(AnnualEarningsAnalyzer::isAnnualRow)
+                .findFirst()
+                .orElse(null);
+
+        if (currentYear == null) {
+            return new CanSlimElement(BigDecimal.ZERO, "연간 재무제표 데이터 부족");
+        }
+
         FinancialStatement previousYear = findPreviousYearFullData(statements, currentYear.getFiscalYear());
 
         if (previousYear == null) {
@@ -67,9 +76,24 @@ public class AnnualEarningsAnalyzer {
         int targetYear = currentYear - 1;
 
         return statements.stream()
-                .filter(s -> s.getFiscalYear() == targetYear && s.getFiscalQuarter() == 4)
+                .filter(s -> s.getFiscalYear() == targetYear && isAnnualRow(s))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * 연간행 판정(하위호환).
+     * <ul>
+     *   <li>US(P4): {@code periodType == ANNUAL} (10-K, fiscalQuarter=null)</li>
+     *   <li>KR(기존): {@code periodType == null && fiscalQuarter == 4} (Q4=연간 하드가정 유지)</li>
+     * </ul>
+     * fiscalQuarter가 null인 경우(US 연간행)의 언박싱 NPE도 이 순서로 방어한다.
+     */
+    private static boolean isAnnualRow(FinancialStatement s) {
+        if (s.getPeriodType() == FiscalPeriodType.ANNUAL) return true;
+        return s.getPeriodType() == null
+                && s.getFiscalQuarter() != null
+                && s.getFiscalQuarter() == 4;
     }
 
     private BigDecimal calculateAnnualScore(BigDecimal growthRate) {

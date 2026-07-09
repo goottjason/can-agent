@@ -27,8 +27,18 @@ public class QuarterlyEarningsAnalyzer {
             return new CanSlimElement(BigDecimal.ZERO, "재무제표 데이터 부족");
         }
 
-        FinancialStatement current = statements.get(0);
-        FinancialStatement previous = findSameQuarterPreviousYear(statements);
+        // 분기행만 대상(US 적재 시 annual 행은 fiscalQuarter=null이라 제외 — 언박싱 NPE 방어 겸용).
+        // KR 기존 데이터는 최신행이 이미 분기값이라 get(0)과 동일 동작(하위호환).
+        FinancialStatement current = statements.stream()
+                .filter(s -> s.getFiscalQuarter() != null)
+                .findFirst()
+                .orElse(null);
+
+        if (current == null) {
+            return new CanSlimElement(BigDecimal.ZERO, "분기 재무제표 데이터 부족");
+        }
+
+        FinancialStatement previous = findSameQuarterPreviousYear(statements, current);
 
         if (previous == null) {
             return new CanSlimElement(BigDecimal.ZERO, "이전 분기 데이터 부족");
@@ -65,15 +75,15 @@ public class QuarterlyEarningsAnalyzer {
         return new CanSlimElement(score, reason, currentVal, previousVal, growthRate);
     }
 
-    private FinancialStatement findSameQuarterPreviousYear(List<FinancialStatement> statements) {
-        if (statements.isEmpty()) return null;
-
-        FinancialStatement current = statements.get(0);
+    private FinancialStatement findSameQuarterPreviousYear(List<FinancialStatement> statements,
+                                                           FinancialStatement current) {
         int targetYear = current.getFiscalYear() - 1;
         int targetQuarter = current.getFiscalQuarter();
 
         return statements.stream()
-                .filter(s -> s.getFiscalYear() == targetYear && s.getFiscalQuarter() == targetQuarter)
+                .filter(s -> s.getFiscalQuarter() != null
+                        && s.getFiscalYear() == targetYear
+                        && s.getFiscalQuarter() == targetQuarter)
                 .findFirst()
                 .orElse(null);
     }

@@ -12,6 +12,11 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     Optional<Stock> findByCode(String code);
 
+    // P4(US): EDGAR CIK 매칭·SEC 유니버스 upsert용.
+    Optional<Stock> findByCik(String cik);
+
+    Optional<Stock> findByTicker(String ticker);
+
     List<Stock> findByActiveTrue();
 
     List<Stock> findByMarketAndActiveTrue(String market);

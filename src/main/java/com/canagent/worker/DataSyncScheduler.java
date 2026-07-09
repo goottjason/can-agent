@@ -1,6 +1,6 @@
 package com.canagent.worker;
 
-import com.canagent.service.DartDataSyncService;
+import com.canagent.port.FinancialsPort;
 import com.canagent.service.KrxDataSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,12 +20,14 @@ public class DataSyncScheduler {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final KrxDataSyncService krxDataSyncService;
-    private final DartDataSyncService dartDataSyncService;
+    // P4: 재무 의존을 구체 DartDataSyncService → FinancialsPort로 전환(P1 디커플 완성).
+    // 유일 구현은 EdgarFinancialsAdapter. KRX/price 경로(krxDataSyncService)는 P5 소관이라 손대지 않는다.
+    private final FinancialsPort financialsPort;
 
     public DataSyncScheduler(KrxDataSyncService krxDataSyncService,
-                             DartDataSyncService dartDataSyncService) {
+                             FinancialsPort financialsPort) {
         this.krxDataSyncService = krxDataSyncService;
-        this.dartDataSyncService = dartDataSyncService;
+        this.financialsPort = financialsPort;
     }
 
     @Scheduled(cron = "${trading.scheduler.sync-cron:0 30 15 * * MON-FRI}", zone = "Asia/Seoul")
@@ -60,7 +62,7 @@ public class DataSyncScheduler {
         String quarter = getQuarter(today);
 
         try {
-            int count = dartDataSyncService.syncAllActiveStocks(year, quarter);
+            int count = financialsPort.syncAllActiveStocks(year, quarter);
             log.info("재무제표 동기화: {}건", count);
         } catch (Exception e) {
             log.error("재무제표 동기화 실패: {}", e.getMessage());
@@ -88,8 +90,12 @@ public class DataSyncScheduler {
     public void runBulkFinancialSync(int quarters) {
         log.info("벌크 재무 동기화 시작: {}분기", quarters);
         try {
-            int count = dartDataSyncService.bulkSyncAllActiveStocks(quarters);
-            log.info("벌크 재무 동기화 완료: {}건 저장", count);
+            // EDGAR companyfacts는 1회 호출로 전체 히스토리를 반환하므로 분기 루프가 불필요하다.
+            // quarters를 "몇 년치 하한"으로 환산해 힌트로 전달(quarter 파라미터는 EDGAR가 무시).
+            int yearsBack = Math.max(1, (quarters + 3) / 4);
+            String startYear = String.valueOf(LocalDate.now(KST).getYear() - yearsBack);
+            int count = financialsPort.syncAllActiveStocks(startYear, null);
+            log.info("벌크 재무 동기화 완료: {}건 저장 (startYear={})", count, startYear);
         } catch (Exception e) {
             log.error("벌크 재무 동기화 실패: {}", e.getMessage());
         }

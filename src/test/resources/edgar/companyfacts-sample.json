@@ -1,0 +1,72 @@
+{
+  "cik": 1800001,
+  "entityName": "Zeta Test Corp",
+  "facts": {
+    "us-gaap": {
+      "Revenues": {
+        "label": "Revenues",
+        "units": {
+          "USD": [
+            {"start": "2022-01-01", "end": "2022-12-31", "val": 800, "fy": 2022, "fp": "FY", "form": "10-K", "filed": "2023-02-01"},
+            {"start": "2023-01-01", "end": "2023-12-31", "val": 1000, "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-01"},
+            {"start": "2023-01-01", "end": "2023-03-31", "val": 200, "fy": 2023, "fp": "Q1", "form": "10-Q", "filed": "2023-04-20"},
+            {"start": "2024-01-01", "end": "2024-03-31", "val": 300, "fy": 2024, "fp": "Q1", "form": "10-Q", "filed": "2024-04-20"},
+            {"start": "2024-01-01", "end": "2024-06-30", "val": 650, "fy": 2024, "fp": "Q2", "form": "10-Q", "filed": "2024-07-20"},
+            {"start": "2024-04-01", "end": "2024-06-30", "val": 350, "fy": 2024, "fp": "Q2", "form": "10-Q", "filed": "2024-07-20"}
+          ]
+        }
+      },
+      "OperatingIncomeLoss": {
+        "label": "Operating Income (Loss)",
+        "units": {
+          "USD": [
+            {"start": "2022-01-01", "end": "2022-12-31", "val": 200, "fy": 2022, "fp": "FY", "form": "10-K", "filed": "2023-02-01"},
+            {"start": "2023-01-01", "end": "2023-12-31", "val": 250, "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-01"}
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "label": "Net Income (Loss)",
+        "units": {
+          "USD": [
+            {"start": "2022-01-01", "end": "2022-12-31", "val": 150, "fy": 2022, "fp": "FY", "form": "10-K", "filed": "2023-02-01"},
+            {"start": "2023-01-01", "end": "2023-12-31", "val": 200, "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-01"},
+            {"start": "2023-01-01", "end": "2023-03-31", "val": 40, "fy": 2023, "fp": "Q1", "form": "10-Q", "filed": "2023-04-20"},
+            {"start": "2024-01-01", "end": "2024-03-31", "val": 60, "fy": 2024, "fp": "Q1", "form": "10-Q", "filed": "2024-04-20"}
+          ]
+        }
+      },
+      "EarningsPerShareDiluted": {
+        "label": "Diluted EPS",
+        "units": {
+          "USD/shares": [
+            {"start": "2022-01-01", "end": "2022-12-31", "val": 1.50, "fy": 2022, "fp": "FY", "form": "10-K", "filed": "2023-02-01"},
+            {"start": "2023-01-01", "end": "2023-12-31", "val": 2.00, "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-01"},
+            {"start": "2023-01-01", "end": "2023-03-31", "val": 0.40, "fy": 2023, "fp": "Q1", "form": "10-Q", "filed": "2023-04-20"},
+            {"start": "2024-01-01", "end": "2024-03-31", "val": 0.60, "fy": 2024, "fp": "Q1", "form": "10-Q", "filed": "2024-04-20"}
+          ]
+        }
+      },
+      "StockholdersEquity": {
+        "label": "Stockholders Equity",
+        "units": {
+          "USD": [
+            {"end": "2022-12-31", "val": 900, "fy": 2022, "fp": "FY", "form": "10-K", "filed": "2023-02-01"},
+            {"end": "2023-12-31", "val": 1000, "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-01"},
+            {"end": "2023-03-31", "val": 950, "fy": 2023, "fp": "Q1", "form": "10-Q", "filed": "2023-04-20"},
+            {"end": "2024-03-31", "val": 1100, "fy": 2024, "fp": "Q1", "form": "10-Q", "filed": "2024-04-20"}
+          ]
+        }
+      },
+      "Liabilities": {
+        "label": "Liabilities",
+        "units": {
+          "USD": [
+            {"end": "2023-12-31", "val": 500, "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-01"},
+            {"end": "2024-03-31", "val": 550, "fy": 2024, "fp": "Q1", "form": "10-Q", "filed": "2024-04-20"}
+          ]
+        }
+      }
+    }
+  }
+}

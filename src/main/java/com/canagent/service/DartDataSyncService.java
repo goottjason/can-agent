@@ -2,7 +2,6 @@ package com.canagent.service;
 
 import com.canagent.domain.stock.FinancialStatement;
 import com.canagent.domain.stock.Stock;
-import com.canagent.port.FinancialsPort;
 import com.canagent.repository.FinancialStatementRepository;
 import com.canagent.repository.StockRepository;
 import com.canagent.service.dto.DartFinancialDTO;
@@ -20,8 +19,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * DART(한국) 재무 동기화 서비스.
+ *
+ * <p>P4(미국 대전환): {@code implements FinancialsPort}를 제거해 포트 빈을 EdgarFinancialsAdapter로 단일화했다.
+ * 클래스와 메서드는 vestigial로 유지(P9에서 삭제 예정). syncAllActiveStocks/importFromJsonFile 시그니처는
+ * 과거 포트 계약과 동일해 호출 흔적이 남아도 동작은 그대로다.
+ */
 @Service
-public class DartDataSyncService implements FinancialsPort {
+public class DartDataSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(DartDataSyncService.class);
 
@@ -37,7 +43,6 @@ public class DartDataSyncService implements FinancialsPort {
         this.financialStatementRepository = financialStatementRepository;
     }
 
-    @Override
     @Transactional
     public int importFromJsonFile(String filePath) {
         try {
@@ -147,7 +152,6 @@ public class DartDataSyncService implements FinancialsPort {
         return 1;
     }
 
-    @Override
     public int syncAllActiveStocks(String year, String quarter) {
         List<Stock> activeStocks = stockRepository.findByActiveTrue();
         int syncCount = 0;
