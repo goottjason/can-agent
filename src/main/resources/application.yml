@@ -46,6 +46,14 @@ edgar:
   base-url: "${EDGAR_BASE_URL:https://data.sec.gov}"
   min-interval-ms: 125
 
+# 토스증권 Open API (P5: 미국 시세/캔들, P6: 주문 공용). 한투/DART/KRX 키는 유지(P9).
+# token-url·캔들 필드명은 PoC 미확정 — 실호출로 확정 시 값만 교체.
+toss:
+  app-key: "${TOSS_APP_KEY:}"
+  app-secret: "${TOSS_APP_SECRET:}"
+  base-url: "${TOSS_BASE_URL:https://openapi.tossinvest.com}"
+  token-url: "${TOSS_TOKEN_URL:}"        # 비우면 base-url + token-path 조합
+
 # 자동매매 스케줄
 trading:
   scheduler:

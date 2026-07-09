@@ -2,7 +2,6 @@ package com.canagent.service;
 
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.stock.StockPrice;
-import com.canagent.port.MarketDataPort;
 import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
 import com.canagent.service.dto.KrxPriceDTO;
@@ -17,8 +16,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * KRX 주가 동기화 서비스.
+ *
+ * <p>P5(미국 대전환): {@code implements MarketDataPort}를 제거했다. MarketDataPort의 유일 빈은
+ * {@code TossMarketDataAdapter}이며, 이 클래스는 빈으로 존재하나 더는 포트가 아니다(P9 삭제 예정,
+ * 클래스·메서드·시그니처 불변).
+ */
 @Service
-public class KrxDataSyncService implements MarketDataPort {
+public class KrxDataSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(KrxDataSyncService.class);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -85,7 +91,6 @@ public class KrxDataSyncService implements MarketDataPort {
         return savedCount;
     }
 
-    @Override
     @Transactional
     public int syncAllActiveStocks(LocalDate startDate, LocalDate endDate) {
         List<Stock> activeStocks = stockRepository.findByActiveTrue();

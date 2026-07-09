@@ -1,7 +1,7 @@
 package com.canagent.worker;
 
 import com.canagent.port.FinancialsPort;
-import com.canagent.service.KrxDataSyncService;
+import com.canagent.port.MarketDataPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,14 +19,15 @@ public class DataSyncScheduler {
     private static final Logger log = LoggerFactory.getLogger(DataSyncScheduler.class);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    private final KrxDataSyncService krxDataSyncService;
-    // P4: 재무 의존을 구체 DartDataSyncService → FinancialsPort로 전환(P1 디커플 완성).
-    // 유일 구현은 EdgarFinancialsAdapter. KRX/price 경로(krxDataSyncService)는 P5 소관이라 손대지 않는다.
+    // P5: price 동기화 의존을 구체 KrxDataSyncService → MarketDataPort로 전환(P1 디커플 완성).
+    // 유일 구현은 TossMarketDataAdapter. 구현·모킹 교체가 가능해진다.
+    private final MarketDataPort marketDataPort;
+    // P4: 재무 의존을 구체 DartDataSyncService → FinancialsPort로 전환. 유일 구현은 EdgarFinancialsAdapter.
     private final FinancialsPort financialsPort;
 
-    public DataSyncScheduler(KrxDataSyncService krxDataSyncService,
+    public DataSyncScheduler(MarketDataPort marketDataPort,
                              FinancialsPort financialsPort) {
-        this.krxDataSyncService = krxDataSyncService;
+        this.marketDataPort = marketDataPort;
         this.financialsPort = financialsPort;
     }
 
@@ -44,7 +45,7 @@ public class DataSyncScheduler {
             LocalDate startDate = today.minusDays(1);
             LocalDate endDate = today;
 
-            int priceCount = krxDataSyncService.syncAllActiveStocks(startDate, endDate);
+            int priceCount = marketDataPort.syncAllActiveStocks(startDate, endDate);
             log.info("주가 데이터 동기화: {}건", priceCount);
         } catch (Exception e) {
             log.error("주가 데이터 동기화 실패: {}", e.getMessage());
@@ -80,8 +81,12 @@ public class DataSyncScheduler {
     public void runBulkPriceSync(int tradingDays) {
         log.info("벌크 주가 동기화 시작: {} 거래일", tradingDays);
         try {
-            int count = krxDataSyncService.bulkSyncAllActiveStocks(tradingDays);
-            log.info("벌크 주가 동기화 완료: {}건 저장", count);
+            // P5: 포트 경유로 전환. 거래일수를 달력 기간으로 환산(주말·휴장 여유 ×1.6)해
+            // 백필 시작일을 산출 → 어댑터가 종목별 캔들 페이지네이션으로 채운다.
+            LocalDate endDate = LocalDate.now(KST);
+            LocalDate startDate = endDate.minusDays((long) (tradingDays * 1.6));
+            int count = marketDataPort.syncAllActiveStocks(startDate, endDate);
+            log.info("벌크 주가 동기화 완료: {}건 저장 ({}~{})", count, startDate, endDate);
         } catch (Exception e) {
             log.error("벌크 주가 동기화 실패: {}", e.getMessage());
         }
