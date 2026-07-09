@@ -34,6 +34,7 @@
         INSUFFICIENT_CASH: { cls: 'blocked', label: '예수금 부족' },
         LIMIT_REACHED: { cls: 'blocked', label: '한도 도달' },
         MIN_AMOUNT: { cls: 'blocked', label: '최소주문 미달' },
+        UNAFFORDABLE: { cls: 'blocked', label: '예산 초과' },
         MARKET_CLOSED: { cls: 'blocked', label: '장 마감' },
         BALANCE_FAIL: { cls: 'failed', label: '잔고 조회 실패' },
         ORDER_FAILED: { cls: 'failed', label: '주문 실패' }
