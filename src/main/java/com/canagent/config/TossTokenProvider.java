@@ -14,10 +14,10 @@ import java.util.Map;
  * <p>P5: 첫 토스 인증. 캔들(P5)·주문(P6) 어댑터가 공용으로 이 빈에서 Bearer 토큰을 얻는다.
  * {@code KoreaInvestmentTokenProvider}의 캐시 패턴(만료 전 갱신·{@code synchronized}·invalidate)을 이식했다.
  *
- * <p><b>PoC 미확정(B실사 §3)</b>: 토큰 발급 요청의 정확한 필드명(appKey/appSecret vs client_id/client_secret,
- * Basic 인증 여부)·content-type·응답 필드({@code access_token}/{@code expires_in})는 실호출 전까지 가정값이다.
- * 요청 본문 조립과 응답 파싱을 이 클래스 한 곳에 모아 두었으니, PoC로 확정되면 여기만 바꾼다.
- * (B실사 2차 힌트: 토큰 1시간 만료·50분 리프레시 권장 → 만료 5분 전 선제 갱신으로 여유 확보.)
+ * <p><b>openapi.json 확정(2026-07-09)</b>: {@code POST /oauth2/token}, application/x-www-form-urlencoded,
+ * {@code grant_type=client_credentials} + {@code client_id} + {@code client_secret}. 응답
+ * {@code access_token}/{@code token_type}/{@code expires_in}. 요청/응답 조립을 이 클래스 한 곳에 모았다.
+ * (만료 5분 전 선제 갱신.)
  */
 @Component
 public class TossTokenProvider {
@@ -51,18 +51,22 @@ public class TossTokenProvider {
     public synchronized String refreshToken() {
         String url = props.getTokenUrl();
 
-        // === PoC 미확정 매핑(요청 본문): 실호출로 확정 대상 ===
-        // 표준 OAuth2 client_credentials. 토스 실제 필드명이 client_id/client_secret일 수 있으므로
-        // 확정 시 이 Map만 교체한다.
-        Map<String, String> body = Map.of(
-                "grant_type", "client_credentials",
-                "appKey", props.getAppKey() == null ? "" : props.getAppKey(),
-                "appSecret", props.getAppSecret() == null ? "" : props.getAppSecret()
-        );
+        // === openapi.json 확정(2026-07-09): POST /oauth2/token, application/x-www-form-urlencoded,
+        // grant_type=client_credentials + client_id + client_secret. ===
+        org.springframework.util.MultiValueMap<String, String> form =
+                new org.springframework.util.LinkedMultiValueMap<>();
+        form.add("grant_type", "client_credentials");
+        form.add("client_id", props.getAppKey() == null ? "" : props.getAppKey());
+        form.add("client_secret", props.getAppSecret() == null ? "" : props.getAppSecret());
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
+        org.springframework.http.HttpEntity<org.springframework.util.MultiValueMap<String, String>> request =
+                new org.springframework.http.HttpEntity<>(form, headers);
 
         try {
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.postForObject(url, body, Map.class);
+            Map<String, Object> response = restTemplate.postForObject(url, request, Map.class);
             // === PoC 미확정 매핑(응답 필드): access_token / expires_in 가정 ===
             if (response != null && response.containsKey("access_token")) {
                 accessToken = String.valueOf(response.get("access_token"));

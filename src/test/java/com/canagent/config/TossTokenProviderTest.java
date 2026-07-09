@@ -91,6 +91,6 @@ class TossTokenProviderTest {
     @DisplayName("토큰 URL은 base-url + token-path로 조합(override 없을 때)")
     void tokenUrlComposition() {
         TossProperties p = props();
-        assertThat(p.getTokenUrl()).isEqualTo("https://toss.test/api/v1/oauth/token");
+        assertThat(p.getTokenUrl()).isEqualTo("https://toss.test/oauth2/token");
     }
 }

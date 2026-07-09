@@ -70,7 +70,7 @@ class TossCandleClientTest {
     }
 
     @Test
-    @DisplayName("Bearer 토큰 헤더와 code/interval/count 쿼리를 부착한다")
+    @DisplayName("Bearer 토큰 헤더와 symbol/interval/count 쿼리를 부착한다")
     void attachesTokenAndQuery() throws Exception {
         TossCandleClient client = new TossCandleClient(restTemplate, props(), tokenProvider);
         when(tokenProvider.getAccessToken()).thenReturn("TOK-XYZ");
@@ -85,7 +85,7 @@ class TossCandleClientTest {
 
         assertThat(url.getValue())
                 .contains("/api/v1/candles")
-                .contains("code=AAPL")
+                .contains("symbol=AAPL")
                 .contains("interval=1d")
                 .contains("count=200");
         HttpHeaders headers = entity.getValue().getHeaders();

@@ -34,8 +34,8 @@ public class TossProperties {
      */
     private String tokenUrl;
 
-    /** 토큰 엔드포인트 상대 경로(baseUrl 하위). PoC 미확정 가정값 — 실호출로 확정. */
-    private String tokenPath = "/api/v1/oauth/token";
+    /** 토큰 엔드포인트 상대 경로(baseUrl 하위). openapi.json 확정(2026-07-09): POST /oauth2/token. */
+    private String tokenPath = "/oauth2/token";
 
     public String getAppKey() { return env("TOSS_APP_KEY", appKey); }
 

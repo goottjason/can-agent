@@ -30,9 +30,10 @@ import java.util.List;
  * {@code before}(ISO8601 커서) 페이지네이션 + 응답 {@code nextBefore}. Bearer 토큰 헤더는
  * {@link TossTokenProvider}에서 요청 단위로만 부착(공유 RestTemplate 오염 방지, EdgarClient 선례).
  *
- * <p><b>PoC 미확정(B실사 §2·§3)</b>: 아래 필드명 상수(캔들 배열키·OHLCV·nextBefore)와 쿼리 파라미터명
- * (symbol/interval/count/before)은 실호출 전 <b>가정값</b>이다. 매핑을 이 파일 한 곳(상수 + {@link #mapCandle})에
- * 모아 두었으니 P6 PoC 실호출로 확정되면 여기만 바꾼다. 어댑터 골격은 durable, 필드명은 tunable.
+ * <p><b>openapi.json 확정(2026-07-09)</b>: 쿼리 {@code symbol/interval/count/before}, 캔들별
+ * {@code timestamp/openPrice/highPrice/lowPrice/closePrice/volume}, 커서 {@code nextBefore}로 교정됨.
+ * 남은 미확정(샌드박스 확정): 응답 envelope 래핑 키(배열 직접 vs candles 래핑 — parse가 양쪽 견고 처리),
+ * {@code timestamp} 타입(ISO8601 vs epoch — mapCandle이 양쪽 처리). 매핑은 이 파일 한 곳에 집중.
  */
 @Component
 public class TossCandleClient {
@@ -45,20 +46,21 @@ public class TossCandleClient {
     private static final String CANDLES_PATH = "/api/v1/candles";
     private static final String INTERVAL_DAILY = "1d";
 
-    // === PoC 미확정 가정: 쿼리 파라미터명 (실호출로 확정) ===
-    private static final String PARAM_SYMBOL = "code";
+    // === openapi.json 확정(2026-07-09): 쿼리 파라미터명 ===
+    private static final String PARAM_SYMBOL = "symbol";
     private static final String PARAM_INTERVAL = "interval";
     private static final String PARAM_COUNT = "count";
     private static final String PARAM_BEFORE = "before";
 
-    // === PoC 미확정 가정: 응답 JSON 필드명 (실호출로 확정) ===
+    // === openapi.json 확정(2026-07-09): 응답 JSON 필드명 ===
+    // 캔들별: timestamp/openPrice/highPrice/lowPrice/closePrice/volume/currency, 커서 nextBefore.
     private static final String FIELD_CANDLES = "candles";
     private static final String FIELD_NEXT_BEFORE = "nextBefore";
-    private static final String FIELD_DATE = "date";
-    private static final String FIELD_OPEN = "open";
-    private static final String FIELD_HIGH = "high";
-    private static final String FIELD_LOW = "low";
-    private static final String FIELD_CLOSE = "close";
+    private static final String FIELD_TIMESTAMP = "timestamp";
+    private static final String FIELD_OPEN = "openPrice";
+    private static final String FIELD_HIGH = "highPrice";
+    private static final String FIELD_LOW = "lowPrice";
+    private static final String FIELD_CLOSE = "closePrice";
     private static final String FIELD_VOLUME = "volume";
 
     private final RestTemplate restTemplate;
@@ -134,9 +136,13 @@ public class TossCandleClient {
         }
     }
 
-    /** 응답 JSON → TossCandlePage. 필드 부재/파싱 실패 캔들은 건너뛴다(견고). */
+    /**
+     * 응답 JSON → TossCandlePage. 필드 부재/파싱 실패 캔들은 건너뛴다(견고).
+     * 응답 envelope는 배열 직접(`[{...}]`) 또는 래핑(`{"candles":[...],"nextBefore":...}`) 양쪽을 견고 처리
+     * (openapi.json이 캔들별 필드는 확정했으나 envelope 래핑 키는 미명시 — 샌드박스 확정 대상).
+     */
     private TossCandlePage parse(JsonNode root, String ticker) {
-        JsonNode arr = root.path(FIELD_CANDLES);
+        JsonNode arr = root.isArray() ? root : root.path(FIELD_CANDLES);
         List<TossCandle> candles = new ArrayList<>();
         if (arr.isArray()) {
             for (Iterator<JsonNode> it = arr.elements(); it.hasNext(); ) {
@@ -150,21 +156,21 @@ public class TossCandleClient {
     }
 
     /**
-     * 캔들 노드 1건 → {@link TossCandle}. <b>PoC 확정 대상 매핑의 유일 지점.</b>
-     * date/OHLC 중 필수값이 없으면 null(해당 캔들 skip).
+     * 캔들 노드 1건 → {@link TossCandle}. 매핑의 유일 지점.
+     * timestamp/OHLC 중 필수값이 없으면 null(해당 캔들 skip).
+     * timestamp는 ISO8601 문자열 또는 epoch millis 숫자 양쪽을 처리(정확한 타입은 샌드박스 확정).
      */
     private TossCandle mapCandle(JsonNode node, String ticker) {
         try {
-            String dateStr = node.path(FIELD_DATE).asText(null);
-            if (dateStr == null || dateStr.isBlank()) return null;
-            LocalDate date = LocalDate.parse(dateStr.length() > 10 ? dateStr.substring(0, 10) : dateStr);
+            LocalDate date = parseTimestamp(node.get(FIELD_TIMESTAMP));
+            if (date == null) return null;
 
             BigDecimal open = decimal(node, FIELD_OPEN);
             BigDecimal high = decimal(node, FIELD_HIGH);
             BigDecimal low = decimal(node, FIELD_LOW);
             BigDecimal close = decimal(node, FIELD_CLOSE);
             if (open == null || high == null || low == null || close == null) {
-                log.debug("토스 캔들 필드 결손 skip: {} {}", ticker, dateStr);
+                log.debug("토스 캔들 필드 결손 skip: {} {}", ticker, date);
                 return null;
             }
             Long volume = longValue(node, FIELD_VOLUME);
@@ -173,6 +179,18 @@ public class TossCandleClient {
             log.debug("토스 캔들 매핑 실패 skip: {} - {}", ticker, e.getMessage());
             return null;
         }
+    }
+
+    /** timestamp 노드 → LocalDate. epoch millis(숫자) 또는 ISO8601 날짜/일시(문자열) 양쪽 지원. */
+    private static LocalDate parseTimestamp(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        if (node.isNumber()) {
+            return java.time.Instant.ofEpochMilli(node.asLong())
+                    .atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        }
+        String s = node.asText(null);
+        if (s == null || s.isBlank()) return null;
+        return LocalDate.parse(s.length() > 10 ? s.substring(0, 10) : s);
     }
 
     private static BigDecimal decimal(JsonNode node, String field) {
