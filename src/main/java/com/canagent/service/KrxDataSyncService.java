@@ -2,6 +2,7 @@ package com.canagent.service;
 
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.stock.StockPrice;
+import com.canagent.port.MarketDataPort;
 import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
 import com.canagent.service.dto.KrxPriceDTO;
@@ -17,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class KrxDataSyncService {
+public class KrxDataSyncService implements MarketDataPort {
 
     private static final Logger log = LoggerFactory.getLogger(KrxDataSyncService.class);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -84,6 +85,7 @@ public class KrxDataSyncService {
         return savedCount;
     }
 
+    @Override
     @Transactional
     public int syncAllActiveStocks(LocalDate startDate, LocalDate endDate) {
         List<Stock> activeStocks = stockRepository.findByActiveTrue();

@@ -2,6 +2,7 @@ package com.canagent.service;
 
 import com.canagent.config.ApiConfig;
 import com.canagent.config.KoreaInvestmentTokenProvider;
+import com.canagent.port.BrokerPort;
 import com.canagent.service.dto.KoreaInvestmentOrderResponse;
 import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
 import com.canagent.service.dto.KoreaInvestmentPriceResponse;
@@ -17,7 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
-public class KoreaInvestmentApiClient {
+public class KoreaInvestmentApiClient implements BrokerPort {
 
     private static final Logger log = LoggerFactory.getLogger(KoreaInvestmentApiClient.class);
 
@@ -61,10 +62,12 @@ public class KoreaInvestmentApiClient {
         this.tokenProvider = tokenProvider;
     }
 
+    @Override
     public KoreaInvestmentOrderResponse buy(String stockCode, int quantity, int price) {
         return executeOrder(stockCode, "01", quantity, price, buyTrId());
     }
 
+    @Override
     public KoreaInvestmentOrderResponse sell(String stockCode, int quantity, int price) {
         return executeOrder(stockCode, "02", quantity, price, sellTrId());
     }
@@ -104,6 +107,7 @@ public class KoreaInvestmentApiClient {
         }
     }
 
+    @Override
     public KoreaInvestmentBalanceResponse getBalance() {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
         String cano = config.getAccountMain();
@@ -146,6 +150,7 @@ public class KoreaInvestmentApiClient {
         }
     }
 
+    @Override
     public KoreaInvestmentPriceResponse getCurrentPrice(String stockCode) {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
 

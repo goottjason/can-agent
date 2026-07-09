@@ -1,6 +1,7 @@
 package com.canagent.service;
 
 import com.canagent.config.ApiConfig;
+import com.canagent.port.BrokerPort;
 import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.trading.Trade;
@@ -32,7 +33,7 @@ public class TradingStrategyService {
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
     private final PortfolioRepository portfolioRepository;
     private final TradeRepository tradeRepository;
-    private final KoreaInvestmentApiClient koreaInvestmentApiClient;
+    private final BrokerPort koreaInvestmentApiClient;
     private final ApiConfig apiConfig;
 
     @Value("${trading.max-positions:10}")
@@ -60,7 +61,7 @@ public class TradingStrategyService {
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
             PortfolioRepository portfolioRepository,
             TradeRepository tradeRepository,
-            KoreaInvestmentApiClient koreaInvestmentApiClient,
+            BrokerPort koreaInvestmentApiClient,
             ApiConfig apiConfig) {
         this.canSlimAnalysisService = canSlimAnalysisService;
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;

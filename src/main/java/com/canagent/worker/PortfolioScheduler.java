@@ -2,7 +2,7 @@ package com.canagent.worker;
 
 import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.repository.PortfolioRepository;
-import com.canagent.service.KoreaInvestmentApiClient;
+import com.canagent.port.BrokerPort;
 import com.canagent.service.dto.KoreaInvestmentPriceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,10 +21,10 @@ public class PortfolioScheduler {
     private static final Logger log = LoggerFactory.getLogger(PortfolioScheduler.class);
 
     private final PortfolioRepository portfolioRepository;
-    private final KoreaInvestmentApiClient koreaInvestmentApiClient;
+    private final BrokerPort koreaInvestmentApiClient;
 
     public PortfolioScheduler(PortfolioRepository portfolioRepository,
-                              KoreaInvestmentApiClient koreaInvestmentApiClient) {
+                              BrokerPort koreaInvestmentApiClient) {
         this.portfolioRepository = portfolioRepository;
         this.koreaInvestmentApiClient = koreaInvestmentApiClient;
     }

@@ -2,6 +2,7 @@ package com.canagent.service;
 
 import com.canagent.domain.stock.FinancialStatement;
 import com.canagent.domain.stock.Stock;
+import com.canagent.port.FinancialsPort;
 import com.canagent.repository.FinancialStatementRepository;
 import com.canagent.repository.StockRepository;
 import com.canagent.service.dto.DartFinancialDTO;
@@ -20,7 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-public class DartDataSyncService {
+public class DartDataSyncService implements FinancialsPort {
 
     private static final Logger log = LoggerFactory.getLogger(DartDataSyncService.class);
 
@@ -36,6 +37,7 @@ public class DartDataSyncService {
         this.financialStatementRepository = financialStatementRepository;
     }
 
+    @Override
     @Transactional
     public int importFromJsonFile(String filePath) {
         try {
@@ -145,6 +147,7 @@ public class DartDataSyncService {
         return 1;
     }
 
+    @Override
     public int syncAllActiveStocks(String year, String quarter) {
         List<Stock> activeStocks = stockRepository.findByActiveTrue();
         int syncCount = 0;

@@ -10,9 +10,9 @@ import com.canagent.repository.AnalysisScoreRepository;
 import com.canagent.repository.MonitorCheckLogRepository;
 import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.TradeRepository;
-import com.canagent.service.KoreaInvestmentApiClient;
-import com.canagent.service.KrxDataSyncService;
-import com.canagent.service.DartDataSyncService;
+import com.canagent.port.BrokerPort;
+import com.canagent.port.MarketDataPort;
+import com.canagent.port.FinancialsPort;
 import com.canagent.service.PortfolioService;
 import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
 import com.canagent.worker.AutoTradingWorker;
@@ -45,9 +45,9 @@ public class DashboardController {
     private final PortfolioService portfolioService;
     private final AutoTradingWorker autoTradingWorker;
     private final IntradayMonitorWorker intradayMonitorWorker;
-    private final KoreaInvestmentApiClient koreaInvestmentApiClient;
-    private final KrxDataSyncService krxDataSyncService;
-    private final DartDataSyncService dartDataSyncService;
+    private final BrokerPort koreaInvestmentApiClient;
+    private final MarketDataPort krxDataSyncService;
+    private final FinancialsPort dartDataSyncService;
     private final ApiConfig apiConfig;
     private final MonitorCheckLogRepository monitorCheckLogRepository;
     private final AnalysisScoreRepository analysisScoreRepository;
@@ -74,9 +74,9 @@ public class DashboardController {
             PortfolioService portfolioService,
             @Autowired(required = false) AutoTradingWorker autoTradingWorker,
             @Autowired(required = false) IntradayMonitorWorker intradayMonitorWorker,
-            KoreaInvestmentApiClient koreaInvestmentApiClient,
-            KrxDataSyncService krxDataSyncService,
-            DartDataSyncService dartDataSyncService,
+            BrokerPort koreaInvestmentApiClient,
+            MarketDataPort krxDataSyncService,
+            FinancialsPort dartDataSyncService,
             ApiConfig apiConfig,
             MonitorCheckLogRepository monitorCheckLogRepository,
             AnalysisScoreRepository analysisScoreRepository,

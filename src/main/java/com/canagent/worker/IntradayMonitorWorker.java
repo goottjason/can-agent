@@ -11,7 +11,7 @@ import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.canagent.service.KoreaInvestmentApiClient;
+import com.canagent.port.BrokerPort;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
 import com.canagent.service.analysis.CanSlimAnalysisService;
@@ -48,7 +48,7 @@ public class IntradayMonitorWorker {
     private final StockPriceRepository stockPriceRepository;
     private final PortfolioRepository portfolioRepository;
     private final AnalysisScoreRepository analysisScoreRepository;
-    private final KoreaInvestmentApiClient koreaInvestmentApiClient;
+    private final BrokerPort koreaInvestmentApiClient;
     private final CanSlimAnalysisService canSlimAnalysisService;
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
     private final TradingStrategyService tradingStrategyService;
@@ -76,7 +76,7 @@ public class IntradayMonitorWorker {
             StockPriceRepository stockPriceRepository,
             PortfolioRepository portfolioRepository,
             AnalysisScoreRepository analysisScoreRepository,
-            KoreaInvestmentApiClient koreaInvestmentApiClient,
+            BrokerPort koreaInvestmentApiClient,
             CanSlimAnalysisService canSlimAnalysisService,
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
             TradingStrategyService tradingStrategyService,
