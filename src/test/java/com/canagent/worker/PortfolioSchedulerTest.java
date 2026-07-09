@@ -54,7 +54,7 @@ class PortfolioSchedulerTest {
 
         KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
         when(response.isSuccess()).thenReturn(true);
-        when(response.getCurrentPrice()).thenReturn(75000);
+        when(response.getCurrentPrice()).thenReturn(new BigDecimal("75000"));
         when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
 
         portfolioScheduler.updatePortfolioPrices();
@@ -96,7 +96,7 @@ class PortfolioSchedulerTest {
 
         KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
         when(response.isSuccess()).thenReturn(true);
-        when(response.getCurrentPrice()).thenReturn(0);
+        when(response.getCurrentPrice()).thenReturn(BigDecimal.ZERO);
         when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
 
         portfolioScheduler.updatePortfolioPrices();
@@ -111,11 +111,11 @@ class PortfolioSchedulerTest {
 
         KoreaInvestmentPriceResponse responseSamsung = mock(KoreaInvestmentPriceResponse.class);
         when(responseSamsung.isSuccess()).thenReturn(true);
-        when(responseSamsung.getCurrentPrice()).thenReturn(75000);
+        when(responseSamsung.getCurrentPrice()).thenReturn(new BigDecimal("75000"));
 
         KoreaInvestmentPriceResponse responseNaver = mock(KoreaInvestmentPriceResponse.class);
         when(responseNaver.isSuccess()).thenReturn(true);
-        when(responseNaver.getCurrentPrice()).thenReturn(320000);
+        when(responseNaver.getCurrentPrice()).thenReturn(new BigDecimal("320000"));
 
         when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(responseSamsung);
         when(koreaInvestmentApiClient.getCurrentPrice("035420")).thenReturn(responseNaver);
@@ -145,7 +145,7 @@ class PortfolioSchedulerTest {
 
         KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
         when(response.isSuccess()).thenReturn(true);
-        when(response.getCurrentPrice()).thenReturn(76000);
+        when(response.getCurrentPrice()).thenReturn(new BigDecimal("76000"));
         when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
 
         portfolioScheduler.updateClosePrices();
@@ -172,11 +172,11 @@ class PortfolioSchedulerTest {
 
         KoreaInvestmentPriceResponse responseSamsung = mock(KoreaInvestmentPriceResponse.class);
         when(responseSamsung.isSuccess()).thenReturn(true);
-        when(responseSamsung.getCurrentPrice()).thenReturn(76000);
+        when(responseSamsung.getCurrentPrice()).thenReturn(new BigDecimal("76000"));
 
         KoreaInvestmentPriceResponse responseNaver = mock(KoreaInvestmentPriceResponse.class);
         when(responseNaver.isSuccess()).thenReturn(true);
-        when(responseNaver.getCurrentPrice()).thenReturn(330000);
+        when(responseNaver.getCurrentPrice()).thenReturn(new BigDecimal("330000"));
 
         when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(responseSamsung);
         when(koreaInvestmentApiClient.getCurrentPrice("035420")).thenReturn(responseNaver);

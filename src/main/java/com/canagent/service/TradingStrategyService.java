@@ -182,8 +182,9 @@ public class TradingStrategyService {
                 log.warn("매수 수량 0 이하: {} (가격: {})", quantity, price);
                 return null;
             }
+            // P2: price.intValue() 절삭 제거 — BigDecimal 가격을 포트로 무손실 전달(USD 센트 보존).
             KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.buy(
-                    stock.getCode(), intQty, price.intValue());
+                    stock.getCode(), intQty, price);
             if (!response.isSuccess()) {
                 log.error("한국투자증권 매수 주문 실패: {}", response.getMsg1());
                 throw new RuntimeException("매수 주문 실패: " + response.getMsg1());
@@ -220,8 +221,9 @@ public class TradingStrategyService {
                 log.warn("매도 수량 0 이하: {} (가격: {})", quantity, price);
                 return null;
             }
+            // P2: price.intValue() 절삭 제거 — BigDecimal 가격을 포트로 무손실 전달(USD 센트 보존).
             KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.sell(
-                    stock.getCode(), intQty, price.intValue());
+                    stock.getCode(), intQty, price);
             if (!response.isSuccess()) {
                 log.error("한국투자증권 매도 주문 실패: {}", response.getMsg1());
                 throw new RuntimeException("매도 주문 실패: " + response.getMsg1());

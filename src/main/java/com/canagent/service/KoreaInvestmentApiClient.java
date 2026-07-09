@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -63,27 +65,33 @@ public class KoreaInvestmentApiClient implements BrokerPort {
     }
 
     @Override
-    public KoreaInvestmentOrderResponse buy(String stockCode, int quantity, int price) {
+    public KoreaInvestmentOrderResponse buy(String stockCode, int quantity, BigDecimal price) {
         return executeOrder(stockCode, "01", quantity, price, buyTrId());
     }
 
     @Override
-    public KoreaInvestmentOrderResponse sell(String stockCode, int quantity, int price) {
+    public KoreaInvestmentOrderResponse sell(String stockCode, int quantity, BigDecimal price) {
         return executeOrder(stockCode, "02", quantity, price, sellTrId());
     }
 
     private KoreaInvestmentOrderResponse executeOrder(String stockCode, String orderType,
-                                                      int quantity, int price, String trId) {
+                                                      int quantity, BigDecimal price, String trId) {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
         String url = config.getBaseUrl() + ORDER_PATH;
+
+        // KRW 정수호가용 임시 변환: KIS 국내주문(ORD_UNPR)은 정수 원화 호가만 받는다.
+        // 포트 계약(BrokerPort)은 BigDecimal 무손실이며, 이 절삭은 KIS 어댑터 내부에 격리된다.
+        // 토스(미국) 어댑터는 소수 가격을 그대로 전달한다. (P2)
+        BigDecimal krwPrice = price.setScale(0, RoundingMode.HALF_UP);
+        boolean marketOrder = price.signum() == 0; // 가격 0 = 시장가(기존 동작 유지)
 
         Map<String, Object> body = new HashMap<>();
         body.put("CANO", config.getAccountMain());
         body.put("ACNT_PRDT_CD", config.getAccountCode());
         body.put("PDNO", stockCode);
-        body.put("ORD_DVSN", price == 0 ? "01" : "00");
+        body.put("ORD_DVSN", marketOrder ? "01" : "00");
         body.put("ORD_QTY", String.valueOf(quantity));
-        body.put("ORD_UNPR", String.valueOf(price));
+        body.put("ORD_UNPR", krwPrice.toPlainString());
         body.put("ALGO_NO", "");
 
         HttpHeaders headers = createHeaders(trId);
@@ -95,7 +103,7 @@ public class KoreaInvestmentApiClient implements BrokerPort {
 
             if (response.getBody() != null && "0".equals(response.getBody().getRtCd())) {
                 log.info("주문 성공: {} {} {}주 @ {}원",
-                        stockCode, orderType.equals("01") ? "매수" : "매도", quantity, price);
+                        stockCode, orderType.equals("01") ? "매수" : "매도", quantity, krwPrice.toPlainString());
                 return response.getBody();
             }
 

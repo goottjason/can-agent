@@ -2,6 +2,8 @@ package com.canagent.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.math.BigDecimal;
+
 public class KoreaInvestmentPriceResponse {
 
     @JsonProperty("rt_cd")
@@ -29,8 +31,10 @@ public class KoreaInvestmentPriceResponse {
         return "0".equals(rtCd);
     }
 
-    public int getCurrentPrice() {
-        return output != null ? output.getCurrentPriceInt() : 0;
+    // P2(미국 대전환): int→BigDecimal 무손실. KRW 정수가는 scale 0으로 담겨 기존 동작과 동일하고,
+    // USD 소수가(예: 150.25)는 절삭 없이 보존된다.
+    public BigDecimal getCurrentPrice() {
+        return output != null ? output.getCurrentPriceDecimal() : BigDecimal.ZERO;
     }
 
     public static KoreaInvestmentPriceResponse error(String message) {
@@ -87,11 +91,12 @@ public class KoreaInvestmentPriceResponse {
         public String getCumulativeTradingAmount() { return cumulativeTradingAmount; }
         public void setCumulativeTradingAmount(String cumulativeTradingAmount) { this.cumulativeTradingAmount = cumulativeTradingAmount; }
 
-        public int getCurrentPriceInt() {
+        // P2: 정수 파싱(Integer.parseInt) 제거 → BigDecimal 파싱으로 소수 가격 보존.
+        public BigDecimal getCurrentPriceDecimal() {
             try {
-                return Integer.parseInt(currentPrice.replace(",", ""));
-            } catch (NumberFormatException e) {
-                return 0;
+                return new BigDecimal(currentPrice.replace(",", ""));
+            } catch (NumberFormatException | NullPointerException e) {
+                return BigDecimal.ZERO;
             }
         }
     }

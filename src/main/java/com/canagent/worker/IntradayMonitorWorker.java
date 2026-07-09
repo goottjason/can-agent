@@ -210,12 +210,12 @@ public class IntradayMonitorWorker {
                     continue;
                 }
 
-                int currentPriceInt = priceResponse.getCurrentPrice();
-                if (currentPriceInt <= 0) {
+                // P2: 현재가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
+                BigDecimal currentPrice = priceResponse.getCurrentPrice();
+                if (currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
 
-                BigDecimal currentPrice = new BigDecimal(currentPriceInt);
                 saveCurrentPrice(stock, currentPrice, priceResponse);
 
                 BigDecimal profitRate = currentPrice.subtract(portfolio.getAverageBuyPrice())
@@ -321,13 +321,12 @@ public class IntradayMonitorWorker {
             return;
         }
 
-        int currentPriceInt = priceResponse.getCurrentPrice();
-        if (currentPriceInt <= 0) {
+        // P2: 현재가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
+        BigDecimal currentPrice = priceResponse.getCurrentPrice();
+        if (currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
             funnel.priceFail++;
             return;
         }
-
-        BigDecimal currentPrice = new BigDecimal(currentPriceInt);
 
         saveCurrentPrice(stock, currentPrice, priceResponse);
 
@@ -685,7 +684,7 @@ public class IntradayMonitorWorker {
             executionByCode.put(s.stock.getCode(), new ExecutionResult(
                     s.stock.getCode(),
                     s.stock.getName(),
-                    s.currentPrice.intValue(),
+                    s.currentPrice,
                     s.canSlimResult.totalScore().intValue(),
                     s.cupResult.score() != null ? s.cupResult.score().intValue() : 0,
                     s.totalScore.intValue(),
@@ -703,7 +702,8 @@ public class IntradayMonitorWorker {
                         int quarterly, int annual, int supplyDemand, int marketDirection,
                         int industryLeader, int institutional, String stage, String reason) {}
 
-        record ExecutionResult(String code, String name, int price, int canSlimScore, int cupScore,
+        // P2: price int→BigDecimal — 실행 관측 레코드도 USD 센트 유실 방지(KRW는 scale 0으로 JSON 직렬화 동일).
+        record ExecutionResult(String code, String name, BigDecimal price, int canSlimScore, int cupScore,
                                int totalScore, String reason, String status, String detail) {}
     }
 }

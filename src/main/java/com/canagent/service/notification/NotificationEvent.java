@@ -56,6 +56,11 @@ public record NotificationEvent(
 
     private String formatPrice(BigDecimal price) {
         if (price == null) return "0";
-        return String.format("%,d", price.longValue());
+        // P2: %,d(longValue) 정수 절삭 제거 → USD 센트 유실 방지.
+        // 정수부 자릿수 구분자는 유지(기존 KRW 동작 동일), 소수부는 유효 자릿수만 표기(무손실).
+        // 통화기호("원"/"$")·로케일은 P8 표시층 소관이라 건드리지 않는다(숫자 포맷 타입만 decimal화).
+        java.text.DecimalFormat df = new java.text.DecimalFormat("#,##0");
+        df.setMaximumFractionDigits(Math.max(0, price.scale()));
+        return df.format(price);
     }
 }

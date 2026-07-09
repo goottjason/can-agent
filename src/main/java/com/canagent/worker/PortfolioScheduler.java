@@ -43,9 +43,9 @@ public class PortfolioScheduler {
                         .getCurrentPrice(portfolio.getStock().getCode());
 
                 if (response != null && response.isSuccess()) {
-                    int currentPriceInt = response.getCurrentPrice();
-                    if (currentPriceInt > 0) {
-                        BigDecimal currentPrice = new BigDecimal(currentPriceInt);
+                    // P2: 현재가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
+                    BigDecimal currentPrice = response.getCurrentPrice();
+                    if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
                         portfolio.updateCurrentPrice(currentPrice);
                         portfolioRepository.save(portfolio);
                         updatedCount++;
@@ -76,9 +76,9 @@ public class PortfolioScheduler {
                         .getCurrentPrice(portfolio.getStock().getCode());
 
                 if (response != null && response.isSuccess()) {
-                    int currentPriceInt = response.getCurrentPrice();
-                    if (currentPriceInt > 0) {
-                        BigDecimal currentPrice = new BigDecimal(currentPriceInt);
+                    // P2: 종가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
+                    BigDecimal currentPrice = response.getCurrentPrice();
+                    if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
                         portfolio.updateCurrentPrice(currentPrice);
                         portfolioRepository.save(portfolio);
                         updatedCount++;
