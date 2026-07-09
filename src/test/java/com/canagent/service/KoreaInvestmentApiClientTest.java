@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -154,6 +155,65 @@ class KoreaInvestmentApiClientTest {
         // then
         assertThat(koreaInvestmentConfig.getAccountMain()).isEqualTo("12345678");
         assertThat(koreaInvestmentConfig.getAccountCode()).isEqualTo("01");
+    }
+
+    @Test
+    @DisplayName("매수 주문 tr_id는 조회(R)가 아닌 주문(U) — 모의투자 회귀방지")
+    void buy_usesOrderTrId_notInquiry_mock() {
+        // given (setUp: setReal(false) → 모의)
+        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        KoreaInvestmentOrderResponse ok = new KoreaInvestmentOrderResponse();
+        ok.setRtCd("0");
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), captor.capture(),
+                eq(KoreaInvestmentOrderResponse.class)))
+                .thenReturn(ResponseEntity.ok(ok));
+
+        // when
+        apiClient.buy("005930", 10, 73000);
+
+        // then — 주문은 U 접미사. R이면 게이트웨이 EGW00202("GW라우팅 오류") 발생
+        String trId = captor.getValue().getHeaders().getFirst("tr_id");
+        assertThat(trId).isEqualTo("VTTC0802U");
+        assertThat(trId).doesNotEndWith("R");
+    }
+
+    @Test
+    @DisplayName("매수/매도 주문 tr_id — 실전투자 TTTC0802U/TTTC0801U")
+    void order_usesRealOrderTrId() {
+        // given
+        koreaInvestmentConfig.setReal(true);
+        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        KoreaInvestmentOrderResponse ok = new KoreaInvestmentOrderResponse();
+        ok.setRtCd("0");
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), captor.capture(),
+                eq(KoreaInvestmentOrderResponse.class)))
+                .thenReturn(ResponseEntity.ok(ok));
+
+        // when / then
+        apiClient.buy("005930", 10, 73000);
+        assertThat(captor.getValue().getHeaders().getFirst("tr_id")).isEqualTo("TTTC0802U");
+
+        apiClient.sell("005930", 10, 75000);
+        assertThat(captor.getValue().getHeaders().getFirst("tr_id")).isEqualTo("TTTC0801U");
+    }
+
+    @Test
+    @DisplayName("잔고 조회 tr_id — 실전 TTTC8434R (조회는 R 유지)")
+    void balance_usesRealBalanceTrId() {
+        // given
+        koreaInvestmentConfig.setReal(true);
+        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        KoreaInvestmentBalanceResponse ok = new KoreaInvestmentBalanceResponse();
+        ok.setRtCd("0");
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), captor.capture(),
+                eq(KoreaInvestmentBalanceResponse.class)))
+                .thenReturn(ResponseEntity.ok(ok));
+
+        // when
+        apiClient.getBalance();
+
+        // then — 잔고는 조회(R)가 맞음
+        assertThat(captor.getValue().getHeaders().getFirst("tr_id")).isEqualTo("TTTC8434R");
     }
 
     @Test

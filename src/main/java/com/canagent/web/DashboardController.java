@@ -57,6 +57,13 @@ public class DashboardController {
     private static final int CHECK_INTERVAL_SECONDS = 300; // monitor-cron = 0 */5 9-15 * * MON-FRI
     private static final int STALE_THRESHOLD_SECONDS = 360; // 검사 6분 초과 시 '지연'
 
+    // #1 계좌 "API 연결 실패" 완화: 대시보드는 SSR로 매 로드마다 잔고를 호출한다.
+    // 한투 잔고조회 유량제한/순단으로 단발 실패 시 즉시 "연결 실패"로 뒤집히던 것을
+    // 단기 캐시 + 재시도 + 마지막 성공값 폴백으로 견고화한다. (읽기 표시 경로 전용 — 워커 매매 경로 불변)
+    private static final long BALANCE_CACHE_TTL_MS = 5_000;
+    private volatile KoreaInvestmentBalanceResponse cachedBalance;
+    private volatile long cachedBalanceAt;
+
     @Value("${trading.min-score:120}")
     private int minScore;
 
@@ -107,17 +114,13 @@ public class DashboardController {
         long availableCashAmount = 0;
         boolean accountConnected = false;
 
-        try {
-            KoreaInvestmentBalanceResponse balanceResponse = koreaInvestmentApiClient.getBalance();
-            if (balanceResponse != null && balanceResponse.isSuccess() && balanceResponse.getOutput2() != null
-                    && !balanceResponse.getOutput2().isEmpty()) {
-                KoreaInvestmentBalanceResponse.AccountSummary summary = balanceResponse.getOutput2().get(0);
-                totalAssetAmount = parseLongSafe(summary.getTotalAssetAmount());
-                availableCashAmount = parseLongSafe(summary.getAvailableCashAmount());
-                accountConnected = true;
-            }
-        } catch (Exception e) {
-            log.warn("계좌 잔고 조회 실패: {}", e.getMessage());
+        KoreaInvestmentBalanceResponse balanceResponse = fetchBalanceResilient();
+        if (balanceResponse != null && balanceResponse.isSuccess() && balanceResponse.getOutput2() != null
+                && !balanceResponse.getOutput2().isEmpty()) {
+            KoreaInvestmentBalanceResponse.AccountSummary summary = balanceResponse.getOutput2().get(0);
+            totalAssetAmount = parseLongSafe(summary.getTotalAssetAmount());
+            availableCashAmount = parseLongSafe(summary.getAvailableCashAmount());
+            accountConnected = true;
         }
 
         model.addAttribute("portfolios", portfolios);
@@ -184,6 +187,48 @@ public class DashboardController {
     public String systemTrading(Model model) {
         model.addAttribute("activeMenu", "trading");
         return "system-trading";
+    }
+
+    /**
+     * 대시보드 표시용 잔고를 견고하게 조회한다.
+     * 1) TTL 내 캐시가 있으면 그대로 사용(연속 새로고침으로 유량제한 유발 방지),
+     * 2) 없으면 최대 2회 재시도하며 실패 시 rt_cd/msg 원인을 로깅,
+     * 3) 전부 실패하면 마지막 성공 잔고(있으면)를 폴백 반환 — 단발 순단으로 "연결 실패"가 뒤집히는 것을 막는다.
+     * 매매 판단이 아닌 관측성 경로이므로 소폭 stale 값 허용.
+     */
+    private KoreaInvestmentBalanceResponse fetchBalanceResilient() {
+        long now = System.currentTimeMillis();
+        KoreaInvestmentBalanceResponse cache = cachedBalance;
+        if (cache != null && now - cachedBalanceAt < BALANCE_CACHE_TTL_MS) {
+            return cache;
+        }
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                KoreaInvestmentBalanceResponse res = koreaInvestmentApiClient.getBalance();
+                if (res != null && res.isSuccess() && res.getOutput2() != null && !res.getOutput2().isEmpty()) {
+                    cachedBalance = res;
+                    cachedBalanceAt = System.currentTimeMillis();
+                    return res;
+                }
+                log.warn("계좌 잔고 조회 비정상 응답 (시도 {}/2): rt_cd={}, msg_cd={}, msg1={}",
+                        attempt,
+                        res != null ? res.getRtCd() : "null",
+                        res != null ? res.getMsgCd() : "null",
+                        res != null ? res.getMsg1() : "null");
+            } catch (Exception e) {
+                log.warn("계좌 잔고 조회 예외 (시도 {}/2): {}", attempt, e.getMessage());
+            }
+            if (attempt < 2) {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        // 모든 시도 실패 — 마지막 성공 잔고라도 반환(없으면 null → "연결 실패" 표기)
+        return cachedBalance;
     }
 
     private long parseLongSafe(String value) {

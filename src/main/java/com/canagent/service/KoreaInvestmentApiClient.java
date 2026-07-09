@@ -26,10 +26,28 @@ public class KoreaInvestmentApiClient {
     private static final String PRICE_PATH = "/uapi/domestic-stock/v1/quotations/inquire-price";
     private static final String HASHKEY_PATH = "/uapi/hashkey";
 
-    private static final String BUY_TR_ID = "TTTC0802R";
-    private static final String SELL_TR_ID = "TTTC0801R";
-    private static final String BALANCE_TR_ID = "TTTC8434R";
-    private static final String PRICE_TR_ID = "FHKST01010100";
+    // 현금주문 tr_id는 조회(R)가 아니라 주문(U) 접미사여야 한다.
+    // R을 POST 주문 엔드포인트로 보내면 게이트웨이가 라우트를 못 찾아 EGW00202("GW라우팅 중 오류")를 반환한다.
+    // 실전/모의는 접두사(TTTC/VTTC)가 다르므로 isReal로 분기한다.
+    private static final String BUY_TR_ID_REAL = "TTTC0802U";
+    private static final String BUY_TR_ID_MOCK = "VTTC0802U";
+    private static final String SELL_TR_ID_REAL = "TTTC0801U";
+    private static final String SELL_TR_ID_MOCK = "VTTC0801U";
+    private static final String BALANCE_TR_ID_REAL = "TTTC8434R";
+    private static final String BALANCE_TR_ID_MOCK = "VTTC8434R";
+    private static final String PRICE_TR_ID = "FHKST01010100"; // 실전·모의 공통
+
+    private String buyTrId() {
+        return apiConfig.getKoreaInvestment().isReal() ? BUY_TR_ID_REAL : BUY_TR_ID_MOCK;
+    }
+
+    private String sellTrId() {
+        return apiConfig.getKoreaInvestment().isReal() ? SELL_TR_ID_REAL : SELL_TR_ID_MOCK;
+    }
+
+    private String balanceTrId() {
+        return apiConfig.getKoreaInvestment().isReal() ? BALANCE_TR_ID_REAL : BALANCE_TR_ID_MOCK;
+    }
 
     private final RestTemplate restTemplate;
     private final ApiConfig apiConfig;
@@ -44,11 +62,11 @@ public class KoreaInvestmentApiClient {
     }
 
     public KoreaInvestmentOrderResponse buy(String stockCode, int quantity, int price) {
-        return executeOrder(stockCode, "01", quantity, price, BUY_TR_ID);
+        return executeOrder(stockCode, "01", quantity, price, buyTrId());
     }
 
     public KoreaInvestmentOrderResponse sell(String stockCode, int quantity, int price) {
-        return executeOrder(stockCode, "02", quantity, price, SELL_TR_ID);
+        return executeOrder(stockCode, "02", quantity, price, sellTrId());
     }
 
     private KoreaInvestmentOrderResponse executeOrder(String stockCode, String orderType,
@@ -106,7 +124,7 @@ public class KoreaInvestmentApiClient {
                 .queryParam("CTX_AREA_NK100", "")
                 .toUriString();
 
-        HttpHeaders headers = createHeaders(BALANCE_TR_ID);
+        HttpHeaders headers = createHeaders(balanceTrId());
         HttpEntity<Void> request = new HttpEntity<>(headers);
 
         try {
