@@ -5,7 +5,7 @@ set -e
 
 SERVER="168.107.31.154"
 USER="ubuntu"
-KEY="/Users/jasonair/Projects/can-agent/ssh-key-2026-06-25.key"
+KEY="$(cd "$(dirname "$0")" && pwd)/ssh-key-2026-06-25.key"  # repo-root 상대경로 (머신 이식성)
 REMOTE_DIR="~/projects/can-agent"
 
 echo "1. 빌드 중..."
