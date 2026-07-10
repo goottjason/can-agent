@@ -3,11 +3,16 @@ package com.canagent.service;
 import com.canagent.config.ApiConfig;
 import com.canagent.config.KoreaInvestmentTokenProvider;
 import com.canagent.port.BrokerPort;
+import com.canagent.port.dto.BrokerBalance;
+import com.canagent.port.dto.OrderResult;
+import com.canagent.port.dto.OrderSpec;
+import com.canagent.port.dto.OrderStatus;
 import com.canagent.service.dto.KoreaInvestmentOrderResponse;
 import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
 import com.canagent.service.dto.KoreaInvestmentPriceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -15,10 +20,24 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 한국투자증권 브로커 어댑터 — {@link BrokerPort} 국내(정수·KRW) 구현.
+ *
+ * <p>P6(미국 대전환): 포트 계약이 broker-중립 값타입으로 재설계됨에 따라, KIS DTO를
+ * {@link OrderResult}/{@link BrokerBalance}/{@link OrderStatus}로 <b>어댑터 내부에서 매핑</b>한다.
+ * REST 조립·KIS DTO 파싱은 종전과 동일(회귀 없음). {@code @Primary}로 현재 국내 운영 기본 빈을 유지하고,
+ * 토스({@code TossBrokerAdapter})는 프로퍼티/프로필로 활성한다.
+ *
+ * <p>국내 경로는 <b>정수 지정가({@code Limit})만 지원</b>한다. {@code Notional}(금액 시장가)은 미국 소수 매수 전용이라
+ * KIS에선 사유를 담아 실패 반환한다(조용실패 금지). 가격 0인 {@code Limit}은 종전과 동일하게 시장가로 처리한다.
+ */
+@Primary
 @Service
 public class KoreaInvestmentApiClient implements BrokerPort {
 
@@ -64,24 +83,144 @@ public class KoreaInvestmentApiClient implements BrokerPort {
         this.tokenProvider = tokenProvider;
     }
 
+    // ========== BrokerPort (broker-중립) ==========
+
     @Override
-    public KoreaInvestmentOrderResponse buy(String stockCode, int quantity, BigDecimal price) {
-        return executeOrder(stockCode, "01", quantity, price, buyTrId());
+    public OrderResult placeBuy(String symbol, OrderSpec spec) {
+        OrderSpec.Limit limit = toDomesticLimit(symbol, spec, "매수");
+        if (limit == null) {
+            return OrderResult.failure("KIS 매수: 유효한 수량/가격 산출 실패(금액기반→정수주 변환 불가)");
+        }
+        return toOrderResult(executeOrder(symbol, "01", limit, buyTrId()));
     }
 
     @Override
-    public KoreaInvestmentOrderResponse sell(String stockCode, int quantity, BigDecimal price) {
-        return executeOrder(stockCode, "02", quantity, price, sellTrId());
+    public OrderResult placeSell(String symbol, OrderSpec spec) {
+        OrderSpec.Limit limit = toDomesticLimit(symbol, spec, "매도");
+        if (limit == null) {
+            return OrderResult.failure("KIS 매도: 유효한 수량/가격 산출 실패(금액기반→정수주 변환 불가)");
+        }
+        return toOrderResult(executeOrder(symbol, "02", limit, sellTrId()));
     }
+
+    @Override
+    public OrderResult modify(String orderId, OrderSpec spec) {
+        // 국내 정정 경로는 이번 단계 범위 밖(현 매매 루프는 정정을 쓰지 않는다). 사유를 담아 실패 반환.
+        return OrderResult.failure("KIS 국내 주문 정정 미구현");
+    }
+
+    @Override
+    public OrderResult cancel(String orderId) {
+        return OrderResult.failure("KIS 국내 주문 취소 미구현");
+    }
+
+    @Override
+    public BrokerBalance getBalance() {
+        return toBrokerBalance(fetchBalance());
+    }
+
+    @Override
+    public OrderStatus getOrder(String orderId) {
+        // 국내 체결 상세 조회는 현 매매 루프 미사용(주문 응답의 성공여부로 판단). 사유를 담아 UNKNOWN 반환.
+        return OrderStatus.failure(orderId, "KIS 국내 주문 상세조회 미구현");
+    }
+
+    @Override
+    public BigDecimal getCurrentPrice(String symbol) {
+        KoreaInvestmentPriceResponse res = fetchCurrentPrice(symbol);
+        if (res == null || !res.isSuccess()) {
+            return BigDecimal.ZERO;
+        }
+        return res.getCurrentPrice();
+    }
+
+    // ========== broker-중립 매핑 ==========
+
+    /**
+     * OrderSpec → 국내 정수 지정가(Limit)로 변환.
+     * <ul>
+     *   <li>{@code Limit}은 그대로 사용(가격 0 = 시장가 유지).
+     *   <li>{@code Notional}(금액 시장가)은 국내 소수주가 불가하므로, 현재가를 조회해
+     *       {@code 정수주 = FLOOR(orderAmount / 현재가)}로 환산하고 시장가(가격 0) Limit으로 라우팅한다.
+     *       (미국 소수 매수는 TossBrokerAdapter가 Notional을 그대로 처리 — 국내만 이 절삭.)
+     * </ul>
+     * 산출 수량이 0 이하이거나 현재가를 못 얻으면 null(호출부가 사유를 담아 실패 반환 — 조용실패 금지).
+     */
+    private OrderSpec.Limit toDomesticLimit(String symbol, OrderSpec spec, String label) {
+        if (spec instanceof OrderSpec.Limit l) {
+            return l;
+        }
+        if (spec instanceof OrderSpec.Notional n) {
+            BigDecimal price = getCurrentPrice(symbol);
+            if (price.signum() <= 0) {
+                log.warn("KIS {} 주문: 현재가 조회 실패로 금액기반→정수주 변환 불가 ({})", label, symbol);
+                return null;
+            }
+            BigDecimal qty = n.orderAmount().divide(price, 0, RoundingMode.FLOOR);
+            if (qty.signum() <= 0) {
+                log.warn("KIS {} 주문: 금액 {} < 1주 {} — 정수주 0 ({})", label, n.orderAmount(), price, symbol);
+                return null;
+            }
+            // 가격 0 = 시장가(executeOrder에서 ORD_DVSN 01로 라우팅). 국내는 시장가 정수주로 체결.
+            return new OrderSpec.Limit(qty, BigDecimal.ZERO);
+        }
+        return null;
+    }
+
+    private OrderResult toOrderResult(KoreaInvestmentOrderResponse res) {
+        if (res == null) {
+            return OrderResult.failure("주문 응답 없음");
+        }
+        if (res.isSuccess()) {
+            return OrderResult.accepted(res.getOrderNo(), res.getMsg1());
+        }
+        return OrderResult.failure(res.getMsg1());
+    }
+
+    private BrokerBalance toBrokerBalance(KoreaInvestmentBalanceResponse res) {
+        if (res == null || !res.isSuccess() || res.getOutput2() == null || res.getOutput2().isEmpty()) {
+            return BrokerBalance.failure(res != null ? res.getMsg1() : "잔고 응답 없음");
+        }
+        KoreaInvestmentBalanceResponse.AccountSummary summary = res.getOutput2().get(0);
+        BigDecimal availableCash = parseBd(summary.getAvailableCashAmount());
+        BigDecimal totalEval = parseBd(summary.getTotalAssetAmount());
+
+        List<BrokerBalance.Holding> holdings = new ArrayList<>();
+        if (res.getOutput1() != null) {
+            for (KoreaInvestmentBalanceResponse.BalanceItem item : res.getOutput1()) {
+                holdings.add(new BrokerBalance.Holding(
+                        item.getStockCode(),
+                        item.getStockName(),
+                        parseBd(item.getHoldingQuantity()),
+                        parseBd(item.getAverageBuyPrice()),
+                        parseBd(item.getEvaluationAmount())));
+            }
+        }
+        return new BrokerBalance(true, availableCash, totalEval, holdings, null);
+    }
+
+    private static BigDecimal parseBd(String v) {
+        if (v == null || v.isBlank()) return BigDecimal.ZERO;
+        try {
+            return new BigDecimal(v.replace(",", "").trim());
+        } catch (NumberFormatException e) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    // ========== KIS REST (DTO 내부 전용) ==========
 
     private KoreaInvestmentOrderResponse executeOrder(String stockCode, String orderType,
-                                                      int quantity, BigDecimal price, String trId) {
+                                                      OrderSpec.Limit limit, String trId) {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
         String url = config.getBaseUrl() + ORDER_PATH;
 
-        // KRW 정수호가용 임시 변환: KIS 국내주문(ORD_UNPR)은 정수 원화 호가만 받는다.
-        // 포트 계약(BrokerPort)은 BigDecimal 무손실이며, 이 절삭은 KIS 어댑터 내부에 격리된다.
-        // 토스(미국) 어댑터는 소수 가격을 그대로 전달한다. (P2)
+        int quantity = limit.qty().setScale(0, RoundingMode.FLOOR).intValue();
+        BigDecimal price = limit.price();
+
+        // KRW 정수호가용 변환: KIS 국내주문(ORD_UNPR)은 정수 원화 호가만 받는다.
+        // 포트 계약(OrderSpec.Limit)은 BigDecimal 무손실이며, 이 절삭은 KIS 어댑터 내부에 격리된다.
+        // 토스(미국) 어댑터는 소수 가격을 그대로 전달한다. (P2/P6)
         BigDecimal krwPrice = price.setScale(0, RoundingMode.HALF_UP);
         boolean marketOrder = price.signum() == 0; // 가격 0 = 시장가(기존 동작 유지)
 
@@ -115,8 +254,7 @@ public class KoreaInvestmentApiClient implements BrokerPort {
         }
     }
 
-    @Override
-    public KoreaInvestmentBalanceResponse getBalance() {
+    private KoreaInvestmentBalanceResponse fetchBalance() {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
         String cano = config.getAccountMain();
         String acntPrdtCd = config.getAccountCode();
@@ -158,8 +296,7 @@ public class KoreaInvestmentApiClient implements BrokerPort {
         }
     }
 
-    @Override
-    public KoreaInvestmentPriceResponse getCurrentPrice(String stockCode) {
+    private KoreaInvestmentPriceResponse fetchCurrentPrice(String stockCode) {
         ApiConfig.KoreaInvestment config = apiConfig.getKoreaInvestment();
 
         String url = UriComponentsBuilder.fromHttpUrl(config.getBaseUrl() + PRICE_PATH)
@@ -201,6 +338,4 @@ public class KoreaInvestmentApiClient implements BrokerPort {
         headers.set("gt_uid", UUID.randomUUID().toString());
         return headers;
     }
-
-
 }

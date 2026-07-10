@@ -2,6 +2,9 @@ package com.canagent.service;
 
 import com.canagent.config.ApiConfig;
 import com.canagent.port.BrokerPort;
+import com.canagent.port.dto.BrokerBalance;
+import com.canagent.port.dto.OrderResult;
+import com.canagent.port.dto.OrderSpec;
 import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.trading.Trade;
@@ -10,8 +13,6 @@ import com.canagent.repository.PortfolioRepository;
 import com.canagent.repository.TradeRepository;
 import com.canagent.service.analysis.CanSlimAnalysisService;
 import com.canagent.service.analysis.CupAndHandleAnalyzer;
-import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
-import com.canagent.service.dto.KoreaInvestmentOrderResponse;
 import com.canagent.service.dto.CanSlimResult;
 import com.canagent.service.dto.CupAndHandleResult;
 import org.slf4j.Logger;
@@ -90,27 +91,32 @@ public class TradingStrategyService {
             return TradingDecision.hold("최대 보유 종목 수 도달");
         }
 
-        KoreaInvestmentBalanceResponse balance = koreaInvestmentApiClient.getBalance();
-        if (!balance.isSuccess() || balance.getOutput2() == null || balance.getOutput2().isEmpty()) {
-            log.warn("잔고 조회 실패: {}", balance.getMsg1());
+        BrokerBalance balance = koreaInvestmentApiClient.getBalance();
+        if (!balance.success()) {
+            log.warn("잔고 조회 실패: {}", balance.message());
             return TradingDecision.hold("잔고 조회 실패");
         }
 
-        String availableCashStr = balance.getOutput2().get(0).getWithdrawableAmount();
-        BigDecimal availableCash = new BigDecimal(availableCashStr);
+        BigDecimal availableCash = balance.availableCash();
 
         BigDecimal totalScore = canSlimResult.totalScore().add(cupResult.score());
         if (totalScore.compareTo(new BigDecimal(String.valueOf(minScore))) < 0) {
             return TradingDecision.hold("점수 미충족: " + totalScore + " < " + minScore);
         }
 
+        // P6(§3): notional 사이징 — 정수 FLOOR 제거. 주문 금액 = 예수금 × positionRate/100.
+        // 소수 수량은 orderAmount/price로 도메인 기록용만 계산(소수 보존, 4자리).
         BigDecimal maxInvestAmount = availableCash.multiply(new BigDecimal(positionRate))
-                .divide(new BigDecimal("100"), 0, RoundingMode.FLOOR);
+                .divide(new BigDecimal("100"), 2, RoundingMode.FLOOR);
 
-        BigDecimal quantity = maxInvestAmount.divide(currentPrice, 0, RoundingMode.FLOOR);
+        if (maxInvestAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return TradingDecision.hold("주문 금액 0 (예수금: " + availableCash + ")");
+        }
+
+        BigDecimal quantity = maxInvestAmount.divide(currentPrice, 4, RoundingMode.FLOOR);
 
         if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            return TradingDecision.hold("매수 수량 0 (예수금: " + availableCash + "원)");
+            return TradingDecision.hold("매수 수량 0 (예수금: " + availableCash + ")");
         }
 
         if (canSlimBuy && cupBuy) {
@@ -177,17 +183,17 @@ public class TradingStrategyService {
         log.info("매수 실행: {} {}주 @ {}원 - {}", stock.getName(), quantity, price, reason);
 
         if (realTrading) {
-            int intQty = quantity.setScale(0, RoundingMode.FLOOR).intValue();
-            if (intQty <= 0) {
+            if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
                 log.warn("매수 수량 0 이하: {} (가격: {})", quantity, price);
                 return null;
             }
-            // P2: price.intValue() 절삭 제거 — BigDecimal 가격을 포트로 무손실 전달(USD 센트 보존).
-            KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.buy(
-                    stock.getCode(), intQty, price);
-            if (!response.isSuccess()) {
-                log.error("한국투자증권 매수 주문 실패: {}", response.getMsg1());
-                throw new RuntimeException("매수 주문 실패: " + response.getMsg1());
+            // P6(§3): notional 매수 — 주문 금액 = 수량 × 가격. 소수 시장가 자동 라우팅(어댑터).
+            BigDecimal orderAmount = quantity.multiply(price);
+            OrderResult response = koreaInvestmentApiClient.placeBuy(
+                    stock.getCode(), OrderSpec.notional(orderAmount));
+            if (!response.success()) {
+                log.error("매수 주문 실패: {}", response.message());
+                throw new RuntimeException("매수 주문 실패: " + response.message());
             }
         } else {
             if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
@@ -216,17 +222,17 @@ public class TradingStrategyService {
         log.info("매도 실행: {} {}주 @ {}원 - {}", stock.getName(), quantity, price, reason);
 
         if (realTrading) {
-            int intQty = quantity.setScale(0, RoundingMode.FLOOR).intValue();
-            if (intQty <= 0) {
+            if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
                 log.warn("매도 수량 0 이하: {} (가격: {})", quantity, price);
                 return null;
             }
-            // P2: price.intValue() 절삭 제거 — BigDecimal 가격을 포트로 무손실 전달(USD 센트 보존).
-            KoreaInvestmentOrderResponse response = koreaInvestmentApiClient.sell(
-                    stock.getCode(), intQty, price);
-            if (!response.isSuccess()) {
-                log.error("한국투자증권 매도 주문 실패: {}", response.getMsg1());
-                throw new RuntimeException("매도 주문 실패: " + response.getMsg1());
+            // P6(§3): 소수 수량 매도(전량/부분 청산). 지정가(Limit) — 가격 무손실 BigDecimal.
+            // KIS는 정수 절삭·KRW 정수호가로 내부 변환, 토스는 소수 수량 그대로.
+            OrderResult response = koreaInvestmentApiClient.placeSell(
+                    stock.getCode(), OrderSpec.limit(quantity, price));
+            if (!response.success()) {
+                log.error("매도 주문 실패: {}", response.message());
+                throw new RuntimeException("매도 주문 실패: " + response.message());
             }
         } else {
             if (quantity.compareTo(BigDecimal.ZERO) <= 0) {

@@ -1,0 +1,9 @@
+{
+  "orderId": "TOSS-ORD-1001",
+  "status": "PARTIAL_FILLED",
+  "filledQuantity": "1.2345",
+  "averageFillPrice": "150.25",
+  "commission": "0.35",
+  "tax": "0.10",
+  "message": "부분 체결"
+}

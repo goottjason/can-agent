@@ -12,14 +12,13 @@ import com.canagent.repository.StockPriceRepository;
 import com.canagent.repository.StockRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.canagent.port.BrokerPort;
+import com.canagent.port.dto.BrokerBalance;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
 import com.canagent.service.analysis.CanSlimAnalysisService;
 import com.canagent.service.analysis.CupAndHandleAnalyzer;
 import com.canagent.service.dto.CanSlimResult;
 import com.canagent.service.dto.CupAndHandleResult;
-import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
-import com.canagent.service.dto.KoreaInvestmentPriceResponse;
 import com.canagent.service.notification.NotificationEvent;
 import com.canagent.service.notification.NotificationServiceRouter;
 import org.slf4j.Logger;
@@ -204,19 +203,13 @@ public class IntradayMonitorWorker {
         for (Portfolio portfolio : heldPositions) {
             try {
                 Stock stock = portfolio.getStock();
-                KoreaInvestmentPriceResponse priceResponse = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
-
-                if (priceResponse == null || !priceResponse.isSuccess()) {
-                    continue;
-                }
-
-                // P2: 현재가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
-                BigDecimal currentPrice = priceResponse.getCurrentPrice();
+                // P6: 포트가 broker-중립 BigDecimal 현재가 반환(실패/0은 skip). USD 센트 무손실.
+                BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
                 if (currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
 
-                saveCurrentPrice(stock, currentPrice, priceResponse);
+                saveCurrentPrice(stock, currentPrice);
 
                 BigDecimal profitRate = currentPrice.subtract(portfolio.getAverageBuyPrice())
                         .divide(portfolio.getAverageBuyPrice(), 4, RoundingMode.HALF_UP)
@@ -315,20 +308,14 @@ public class IntradayMonitorWorker {
     }
 
     private void processStockForSignal(Stock stock, List<SignalStock> signalStocks, CheckFunnel funnel) {
-        KoreaInvestmentPriceResponse priceResponse = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
-        if (priceResponse == null || !priceResponse.isSuccess()) {
-            funnel.priceFail++;
-            return;
-        }
-
-        // P2: 현재가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
-        BigDecimal currentPrice = priceResponse.getCurrentPrice();
+        // P6: 포트가 broker-중립 BigDecimal 현재가 반환(실패/0은 priceFail 카운트). USD 센트 무손실.
+        BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
         if (currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
             funnel.priceFail++;
             return;
         }
 
-        saveCurrentPrice(stock, currentPrice, priceResponse);
+        saveCurrentPrice(stock, currentPrice);
 
         // 보유 종목이면 매수 스킵
         Optional<Portfolio> existingPosition =
@@ -382,21 +369,14 @@ public class IntradayMonitorWorker {
         signalStocks.add(new SignalStock(stock, currentPrice, canSlimResult, cupResult, totalScore, reason));
     }
 
-    private void saveCurrentPrice(Stock stock, BigDecimal currentPrice, KoreaInvestmentPriceResponse response) {
+    private void saveCurrentPrice(Stock stock, BigDecimal currentPrice) {
         try {
-            KoreaInvestmentPriceResponse.PriceOutput output = response.getOutput();
+            // P6: 포트가 스팟 현재가만 반환(OHLC·거래량 없음). 장중 임시 저장은 현재가로 O/H/L/C를 채운다.
+            // 정식 OHLC·거래량은 캔들 동기화 경로(MarketDataPort)가 채운다(§4.1).
             StockPrice stockPrice = new StockPrice(
                     stock,
                     LocalDate.now(java.time.ZoneId.of("Asia/Seoul")),
-                    output != null ? parseBigDecimal(output.getOpeningPrice()) : currentPrice,
-                    output != null ? parseBigDecimal(output.getHighPrice()) : currentPrice,
-                    output != null ? parseBigDecimal(output.getLowPrice()) : currentPrice,
-                    currentPrice,
-                    output != null ? parseLong(output.getCumulativeVolume()) : 0L
-            );
-            if (output != null) {
-                stockPrice.setChangeRate(parseBigDecimal(output.getChangeRate()));
-            }
+                    currentPrice, currentPrice, currentPrice, currentPrice, 0L);
             stockPriceRepository.save(stockPrice);
         } catch (Exception e) {
             log.error("현재가 저장 실패: {} - {}", stock.getCode(), e.getMessage());
@@ -431,7 +411,7 @@ public class IntradayMonitorWorker {
             return;
         }
 
-        KoreaInvestmentBalanceResponse balance = getBalance();
+        BrokerBalance balance = getBalance();
         if (balance == null) {
             for (SignalStock s : signalStocks) {
                 funnel.recordExecution(s, "BALANCE_FAIL", "잔고 조회 실패");
@@ -439,23 +419,22 @@ public class IntradayMonitorWorker {
             return;
         }
 
-        BigDecimal availableCashBd = parseBigDecimal(balance.getOutput2().get(0).getWithdrawableAmount());
-        if (availableCashBd.compareTo(BigDecimal.ZERO) <= 0) {
-            log.info("예수금 부족: {}원", availableCashBd);
+        BigDecimal availableCash = balance.availableCash();
+        if (availableCash.compareTo(BigDecimal.ZERO) <= 0) {
+            log.info("예수금 부족: {}", availableCash);
             for (SignalStock s : signalStocks) {
-                funnel.recordExecution(s, "INSUFFICIENT_CASH", "예수금 부족: " + availableCashBd + "원");
+                funnel.recordExecution(s, "INSUFFICIENT_CASH", "예수금 부족: " + availableCash);
             }
             return;
         }
-        long availableCash = availableCashBd.longValue();
 
-        // 매수 계획 수립(순수 로직): 예수금 필터 → 점수순 슬롯 선정 → 종목당 상한(positionRate%) → 잔여 이월.
-        // 소수점 주문이 불가하므로 정수 주 단위. 1주가 예수금 초과인 종목은 슬롯 낭비 없이 제외.
+        // P6(§3): notional 매수 계획(순수 로직). 예수금 필터 → 점수순 슬롯 선정 → 종목당 상한(positionRate%)
+        // → 잔여 이월. 소수 매수(orderAmount)이므로 정수 FLOOR·최소주문 정수주 로직 제거.
         Map<String, SignalStock> byCode = new LinkedHashMap<>();
         List<PlanInput> inputs = new ArrayList<>();
         for (SignalStock s : signalStocks) {
             byCode.put(s.stock.getCode(), s);
-            inputs.add(new PlanInput(s.stock.getCode(), s.currentPrice.longValue(), s.totalScore.intValue()));
+            inputs.add(new PlanInput(s.stock.getCode(), s.currentPrice, s.totalScore.intValue()));
         }
         List<PlanResult> plan = planPurchases(inputs, availableCash, availableSlots, positionRate);
 
@@ -467,9 +446,10 @@ public class IntradayMonitorWorker {
                 continue;
             }
 
-            BigDecimal quantity = BigDecimal.valueOf(pr.qty());
-            log.info("매수 시도: {} {}주 @ {}원 (배분 {}원)",
-                    signal.stock.getName(), pr.qty(), signal.currentPrice, pr.cost());
+            // 소수 수량 = 주문금액 / 현재가(4자리). 도메인 Trade/Portfolio 기록용.
+            BigDecimal quantity = pr.orderAmount().divide(signal.currentPrice, 4, RoundingMode.FLOOR);
+            log.info("매수 시도: {} 배분 {} @ {} (≈{}주)",
+                    signal.stock.getName(), pr.orderAmount(), signal.currentPrice, quantity);
             try {
                 Trade trade = null;
                 for (int retry = 0; retry < 3; retry++) {
@@ -478,7 +458,7 @@ public class IntradayMonitorWorker {
                                 signal.stock,
                                 quantity,
                                 signal.currentPrice,
-                                signal.reason + String.format(" (%d주 @ %s원, 배분 %d원)", pr.qty(), signal.currentPrice, pr.cost())
+                                signal.reason + String.format(" (배분 %s @ %s, ≈%s주)", pr.orderAmount(), signal.currentPrice, quantity)
                         );
                         break;
                     } catch (Exception retryEx) {
@@ -494,7 +474,7 @@ public class IntradayMonitorWorker {
                 if (trade != null) {
                     notificationServiceRouter.sendNotification(NotificationEvent.fromTrade(trade));
                     funnel.recordExecution(signal, "ORDER_SUCCESS",
-                            String.format("%d주 @ %s원 (배분 %d원)", pr.qty(), signal.currentPrice, pr.cost()));
+                            String.format("배분 %s @ %s (≈%s주)", pr.orderAmount(), signal.currentPrice, quantity));
                 } else {
                     funnel.recordExecution(signal, "ORDER_FAILED", "주문 결과 없음(수량 0 또는 시뮬레이션)");
                 }
@@ -508,98 +488,104 @@ public class IntradayMonitorWorker {
 
     // ========== 매수 계획(순수 함수 — 부작용 없음, 단위테스트 대상) ==========
 
-    enum PlanStatus { BUY, UNAFFORDABLE, LIMIT_REACHED, MIN_AMOUNT }
+    enum PlanStatus { BUY, LIMIT_REACHED, MIN_AMOUNT }
 
-    /** 계획 입력: 종목코드·현재가(원)·총점. */
-    record PlanInput(String code, long price, int score) {}
+    /** 계획 입력: 종목코드·현재가·총점. price는 유효성 판정(≤0 제외)에만 쓰인다(notional은 수량 무관). */
+    record PlanInput(String code, BigDecimal price, int score) {}
 
-    /** 계획 결과: 종목별 매수수량 또는 탈락 사유. */
-    record PlanResult(String code, PlanStatus status, int qty, long cost, String detail) {}
+    /** 계획 결과: 종목별 매수 주문금액(orderAmount) 또는 탈락 사유. */
+    record PlanResult(String code, PlanStatus status, BigDecimal orderAmount, String detail) {}
+
+    /** notional 매수 계획에서 배분금액이 이 값 미만이면 매수하지 않는다(먼지 주문 방지). 통화 그대로. */
+    private static final BigDecimal MIN_ORDER_AMOUNT = new BigDecimal("1");
 
     /**
-     * 정수 주 단위 분산 매수 계획을 수립한다(부작용 없음).
-     * 1) 예수금 필터: 1주 가격 &gt; 예수금 → UNAFFORDABLE(소수점 미지원, 슬롯 미소비),
+     * notional(금액기반) 분산 매수 계획을 수립한다(부작용 없음). 소수 매수이므로 정수 주·최소주문 정수 로직 없음.
+     * 1) 유효성 필터: 현재가 ≤0은 MIN_AMOUNT(0으로 나눔 방지 — 소수 수량 환산 불가),
      * 2) 점수 desc 정렬 후 가용 슬롯만큼 선정(초과분 LIMIT_REACHED),
-     * 3) 종목당 상한 = 예수금 × positionRate%(분산: 10% 기본)까지 점수순으로 정수 매수,
-     * 4) 잔여현금을 점수순 라운드로빈(1주씩)으로 이월 — 분산(다양성) 우선,
-     * 5) 끝내 0주면 MIN_AMOUNT.
+     * 3) 종목당 상한 = 예수금 × positionRate%(분산: 10% 기본)까지 점수순으로 금액 배분,
+     * 4) 잔여현금을 점수순으로 균등 이월(상한 무시, 남은 현금 소진) — 분산(다양성) 우선,
+     * 5) 배분금액이 {@link #MIN_ORDER_AMOUNT} 미만이면 MIN_AMOUNT.
      */
-    static List<PlanResult> planPurchases(List<PlanInput> signals, long availableCash,
+    static List<PlanResult> planPurchases(List<PlanInput> signals, BigDecimal availableCash,
                                           int availableSlots, int positionRate) {
         List<PlanResult> results = new ArrayList<>();
         if (availableSlots <= 0) {
             for (PlanInput s : signals) {
-                results.add(new PlanResult(s.code(), PlanStatus.LIMIT_REACHED, 0, 0, "최대 보유 종목 수 도달"));
+                results.add(new PlanResult(s.code(), PlanStatus.LIMIT_REACHED, BigDecimal.ZERO, "최대 보유 종목 수 도달"));
             }
             return results;
         }
 
-        // 1) 예수금 필터 — 슬롯 미소비. price<=0(유효하지 않은 현재가)은 0으로 나눔·무한이월 방지 위해 제외.
-        List<PlanInput> affordable = new ArrayList<>();
+        // 1) 유효성 필터 — price≤0(유효하지 않은 현재가)은 소수 수량 환산 불가라 제외.
+        List<PlanInput> valid = new ArrayList<>();
         for (PlanInput s : signals) {
-            if (s.price() <= 0) {
-                results.add(new PlanResult(s.code(), PlanStatus.MIN_AMOUNT, 0, 0, "유효하지 않은 현재가"));
-            } else if (s.price() > availableCash) {
-                results.add(new PlanResult(s.code(), PlanStatus.UNAFFORDABLE, 0, 0,
-                        "1주 " + s.price() + "원 > 예수금 " + availableCash + "원 (소수점 미지원)"));
+            if (s.price() == null || s.price().signum() <= 0) {
+                results.add(new PlanResult(s.code(), PlanStatus.MIN_AMOUNT, BigDecimal.ZERO, "유효하지 않은 현재가"));
             } else {
-                affordable.add(s);
+                valid.add(s);
             }
         }
 
         // 2) 점수순 정렬 후 슬롯 선정
-        affordable.sort(Comparator.comparingInt(PlanInput::score).reversed());
-        int limit = Math.min(availableSlots, affordable.size());
-        List<PlanInput> selected = new ArrayList<>(affordable.subList(0, limit));
-        for (int i = limit; i < affordable.size(); i++) {
-            results.add(new PlanResult(affordable.get(i).code(), PlanStatus.LIMIT_REACHED, 0, 0,
+        valid.sort(Comparator.comparingInt(PlanInput::score).reversed());
+        int limit = Math.min(availableSlots, valid.size());
+        List<PlanInput> selected = new ArrayList<>(valid.subList(0, limit));
+        for (int i = limit; i < valid.size(); i++) {
+            results.add(new PlanResult(valid.get(i).code(), PlanStatus.LIMIT_REACHED, BigDecimal.ZERO,
                     "가용 슬롯(" + availableSlots + ") 초과"));
         }
+        if (selected.isEmpty()) {
+            return results;
+        }
 
-        // 3) 종목당 상한(positionRate%) — 점수순 정수 매수
-        long perPositionCap = Math.max(1L, availableCash * positionRate / 100);
-        Map<String, Integer> qty = new LinkedHashMap<>();
-        for (PlanInput s : selected) qty.put(s.code(), 0);
-        long remaining = availableCash;
+        // 3) 종목당 상한(positionRate%) — 점수순 금액 배분. 상한 최소 방어는 두지 않고, 부족분은 이월이 채운다.
+        BigDecimal perPositionCap = availableCash
+                .multiply(BigDecimal.valueOf(positionRate))
+                .divide(new BigDecimal("100"), 2, RoundingMode.FLOOR);
+        Map<String, BigDecimal> amount = new LinkedHashMap<>();
+        for (PlanInput s : selected) amount.put(s.code(), BigDecimal.ZERO);
+        BigDecimal remaining = availableCash;
         for (PlanInput s : selected) {
-            long budget = Math.min(perPositionCap, remaining);
-            int q = (int) (budget / s.price());
-            if (q > 0) {
-                qty.merge(s.code(), q, Integer::sum);
-                remaining -= (long) q * s.price();
+            BigDecimal alloc = perPositionCap.min(remaining);
+            if (alloc.signum() > 0) {
+                amount.merge(s.code(), alloc, BigDecimal::add);
+                remaining = remaining.subtract(alloc);
             }
         }
 
-        // 4) 잔여현금 이월 — 점수순 라운드로빈(1주씩), 분산 우선
-        boolean progressed = true;
-        while (progressed && remaining > 0) {
-            progressed = false;
-            for (PlanInput s : selected) {
-                if (remaining >= s.price()) {
-                    qty.merge(s.code(), 1, Integer::sum);
-                    remaining -= s.price();
-                    progressed = true;
+        // 4) 잔여현금 이월 — 점수순 종목에 균등 배분(소진). 소수 매수라 라운드로빈 없이 한 번에 나눈다.
+        if (remaining.signum() > 0) {
+            BigDecimal share = remaining.divide(BigDecimal.valueOf(selected.size()), 2, RoundingMode.FLOOR);
+            if (share.signum() > 0) {
+                for (PlanInput s : selected) {
+                    amount.merge(s.code(), share, BigDecimal::add);
+                    remaining = remaining.subtract(share);
                 }
+            }
+            // 나눔 나머지(잔돈)는 점수 최상위 종목에 몰아준다.
+            if (remaining.signum() > 0) {
+                amount.merge(selected.get(0).code(), remaining, BigDecimal::add);
             }
         }
 
         // 5) 결과화
         for (PlanInput s : selected) {
-            int q = qty.get(s.code());
-            if (q > 0) {
-                results.add(new PlanResult(s.code(), PlanStatus.BUY, q, (long) q * s.price(), null));
+            BigDecimal a = amount.get(s.code());
+            if (a.compareTo(MIN_ORDER_AMOUNT) >= 0) {
+                results.add(new PlanResult(s.code(), PlanStatus.BUY, a, null));
             } else {
-                results.add(new PlanResult(s.code(), PlanStatus.MIN_AMOUNT, 0, 0,
-                        "잔여현금 부족(1주 " + s.price() + "원)"));
+                results.add(new PlanResult(s.code(), PlanStatus.MIN_AMOUNT, BigDecimal.ZERO,
+                        "배분금액 부족(" + a + " < " + MIN_ORDER_AMOUNT + ")"));
             }
         }
         return results;
     }
 
-    private KoreaInvestmentBalanceResponse getBalance() {
+    private BrokerBalance getBalance() {
         try {
-            KoreaInvestmentBalanceResponse balance = koreaInvestmentApiClient.getBalance();
-            if (balance != null && balance.isSuccess() && balance.getOutput2() != null && !balance.getOutput2().isEmpty()) {
+            BrokerBalance balance = koreaInvestmentApiClient.getBalance();
+            if (balance != null && balance.success()) {
                 return balance;
             }
         } catch (Exception e) {
@@ -614,24 +600,6 @@ public class IntradayMonitorWorker {
     public int getLastScanCount() { return lastScanCount; }
     public int getMinScore() { return minScore; }
     public List<Map<String, Object>> getLastSignals() { return lastSignals; }
-
-    private BigDecimal parseBigDecimal(String value) {
-        if (value == null || value.isBlank()) return BigDecimal.ZERO;
-        try {
-            return new BigDecimal(value.replace(",", ""));
-        } catch (NumberFormatException e) {
-            return BigDecimal.ZERO;
-        }
-    }
-
-    private Long parseLong(String value) {
-        if (value == null || value.isBlank()) return 0L;
-        try {
-            return Long.parseLong(value.replace(",", ""));
-        } catch (NumberFormatException e) {
-            return 0L;
-        }
-    }
 
     private record SignalStock(
             Stock stock,

@@ -25,6 +25,12 @@ public class TossProperties {
     /** OAuth2 client_credentials appSecret(발급). 미설정 시 env {@code TOSS_APP_SECRET} 폴백. */
     private String appSecret;
 
+    /**
+     * 계좌 식별자(계좌콜 헤더 {@code X-Tossinvest-Account}용). 미설정 시 env {@code TOSS_ACCOUNT} 폴백.
+     * <b>PoC 미확정</b>(B실사 §3): 계좌 지정 방식(헤더명·accountSeq 조회 선행 여부)이 실호출 전까지 미확정.
+     */
+    private String account;
+
     /** 토스 Open API base URL. B실사 1차출처 canonical 호스트. sandbox/live 전환은 env override. */
     private String baseUrl = "https://openapi.tossinvest.com";
 
@@ -44,6 +50,10 @@ public class TossProperties {
     public String getAppSecret() { return env("TOSS_APP_SECRET", appSecret); }
 
     public void setAppSecret(String appSecret) { this.appSecret = appSecret; }
+
+    public String getAccount() { return env("TOSS_ACCOUNT", account); }
+
+    public void setAccount(String account) { this.account = account; }
 
     public String getBaseUrl() { return env("TOSS_BASE_URL", baseUrl); }
 

@@ -4,8 +4,7 @@ import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.FinancialStatement;
 import com.canagent.domain.stock.Stock;
 import com.canagent.domain.stock.StockPrice;
-import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.canagent.port.dto.BrokerBalance;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,20 +12,10 @@ import java.util.List;
 
 public class MockDataFactory {
 
-    // 잔고 조회 성공 응답(출금가능금액 지정) — 실외부 API 호출을 격리하기 위한 테스트 스텁용
-    public static KoreaInvestmentBalanceResponse createBalanceResponse(String withdrawableAmount) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            KoreaInvestmentBalanceResponse.AccountSummary summary = mapper.readValue(
-                    "{\"prvs_rcdl_excc_amt\":\"" + withdrawableAmount + "\"}",
-                    KoreaInvestmentBalanceResponse.AccountSummary.class);
-            KoreaInvestmentBalanceResponse response = new KoreaInvestmentBalanceResponse();
-            response.setRtCd("0");
-            response.setOutput2(List.of(summary));
-            return response;
-        } catch (Exception e) {
-            throw new RuntimeException("테스트 잔고 응답 생성 실패", e);
-        }
+    // 잔고 조회 성공 응답(주문 가능 현금 지정) — 실외부 API 호출을 격리하기 위한 broker-중립 테스트 스텁.
+    public static BrokerBalance createBalanceResponse(String availableCash) {
+        BigDecimal cash = new BigDecimal(availableCash);
+        return new BrokerBalance(true, cash, cash, List.of(), null);
     }
 
     public static Stock createStock(String code, String name, String market, String sector) {

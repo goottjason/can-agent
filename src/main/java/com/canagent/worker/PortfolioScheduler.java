@@ -3,7 +3,6 @@ package com.canagent.worker;
 import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.repository.PortfolioRepository;
 import com.canagent.port.BrokerPort;
-import com.canagent.service.dto.KoreaInvestmentPriceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -39,17 +38,12 @@ public class PortfolioScheduler {
 
         for (Portfolio portfolio : activePortfolios) {
             try {
-                KoreaInvestmentPriceResponse response = koreaInvestmentApiClient
-                        .getCurrentPrice(portfolio.getStock().getCode());
-
-                if (response != null && response.isSuccess()) {
-                    // P2: 현재가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
-                    BigDecimal currentPrice = response.getCurrentPrice();
-                    if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
-                        portfolio.updateCurrentPrice(currentPrice);
-                        portfolioRepository.save(portfolio);
-                        updatedCount++;
-                    }
+                // P6: 포트가 broker-중립 BigDecimal 현재가를 직접 반환(실패/0은 skip). USD 센트 무손실.
+                BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(portfolio.getStock().getCode());
+                if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
+                    portfolio.updateCurrentPrice(currentPrice);
+                    portfolioRepository.save(portfolio);
+                    updatedCount++;
                 }
             } catch (Exception e) {
                 log.error("현재가 갱신 실패: {} ({}) - {}",
@@ -72,17 +66,12 @@ public class PortfolioScheduler {
 
         for (Portfolio portfolio : activePortfolios) {
             try {
-                KoreaInvestmentPriceResponse response = koreaInvestmentApiClient
-                        .getCurrentPrice(portfolio.getStock().getCode());
-
-                if (response != null && response.isSuccess()) {
-                    // P2: 종가 int→BigDecimal 무손실 소비(USD 센트 보존). KRW는 scale 0으로 기존 동작 동일.
-                    BigDecimal currentPrice = response.getCurrentPrice();
-                    if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
-                        portfolio.updateCurrentPrice(currentPrice);
-                        portfolioRepository.save(portfolio);
-                        updatedCount++;
-                    }
+                // P6: 포트가 broker-중립 BigDecimal 종가를 직접 반환(실패/0은 skip). USD 센트 무손실.
+                BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(portfolio.getStock().getCode());
+                if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
+                    portfolio.updateCurrentPrice(currentPrice);
+                    portfolioRepository.save(portfolio);
+                    updatedCount++;
                 }
             } catch (Exception e) {
                 log.error("종가 갱신 실패: {} ({}) - {}",

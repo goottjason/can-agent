@@ -5,7 +5,6 @@ import com.canagent.domain.portfolio.Portfolio;
 import com.canagent.domain.stock.Stock;
 import com.canagent.repository.PortfolioRepository;
 import com.canagent.service.KoreaInvestmentApiClient;
-import com.canagent.service.dto.KoreaInvestmentPriceResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,11 +50,7 @@ class PortfolioSchedulerTest {
     @DisplayName("현재가 갱신 - 정상 업데이트")
     void updatePortfolioPrices_validResponse_updatesPrice() {
         when(portfolioRepository.findByActiveTrue()).thenReturn(List.of(portfolioSamsung));
-
-        KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
-        when(response.isSuccess()).thenReturn(true);
-        when(response.getCurrentPrice()).thenReturn(new BigDecimal("75000"));
-        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
+        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(new BigDecimal("75000"));
 
         portfolioScheduler.updatePortfolioPrices();
 
@@ -76,28 +71,11 @@ class PortfolioSchedulerTest {
     }
 
     @Test
-    @DisplayName("현재가 갱신 - 응답 실패 시 저장 안함")
-    void updatePortfolioPrices_failedResponse_doesNotSave() {
-        when(portfolioRepository.findByActiveTrue()).thenReturn(List.of(portfolioSamsung));
-
-        KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
-        when(response.isSuccess()).thenReturn(false);
-        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
-
-        portfolioScheduler.updatePortfolioPrices();
-
-        verify(portfolioRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("현재가 갱신 - 가격이 0일 때 저장 안함")
+    @DisplayName("현재가 갱신 - 조회 실패(0 반환) 시 저장 안함")
     void updatePortfolioPrices_zeroPrice_doesNotSave() {
         when(portfolioRepository.findByActiveTrue()).thenReturn(List.of(portfolioSamsung));
-
-        KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
-        when(response.isSuccess()).thenReturn(true);
-        when(response.getCurrentPrice()).thenReturn(BigDecimal.ZERO);
-        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
+        // P6: 포트는 실패/응답이상 시 0을 반환한다(조용실패가 아니라 명시적 0 → skip).
+        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(BigDecimal.ZERO);
 
         portfolioScheduler.updatePortfolioPrices();
 
@@ -108,17 +86,8 @@ class PortfolioSchedulerTest {
     @DisplayName("현재가 갱신 - 여러 종목 업데이트")
     void updatePortfolioPrices_multipleStocks_updatesAll() {
         when(portfolioRepository.findByActiveTrue()).thenReturn(List.of(portfolioSamsung, portfolioNaver));
-
-        KoreaInvestmentPriceResponse responseSamsung = mock(KoreaInvestmentPriceResponse.class);
-        when(responseSamsung.isSuccess()).thenReturn(true);
-        when(responseSamsung.getCurrentPrice()).thenReturn(new BigDecimal("75000"));
-
-        KoreaInvestmentPriceResponse responseNaver = mock(KoreaInvestmentPriceResponse.class);
-        when(responseNaver.isSuccess()).thenReturn(true);
-        when(responseNaver.getCurrentPrice()).thenReturn(new BigDecimal("320000"));
-
-        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(responseSamsung);
-        when(koreaInvestmentApiClient.getCurrentPrice("035420")).thenReturn(responseNaver);
+        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(new BigDecimal("75000"));
+        when(koreaInvestmentApiClient.getCurrentPrice("035420")).thenReturn(new BigDecimal("320000"));
 
         portfolioScheduler.updatePortfolioPrices();
 
@@ -142,11 +111,7 @@ class PortfolioSchedulerTest {
     @DisplayName("종가 갱신 - 정상 업데이트")
     void updateClosePrices_validResponse_updatesPrice() {
         when(portfolioRepository.findByActiveTrue()).thenReturn(List.of(portfolioSamsung));
-
-        KoreaInvestmentPriceResponse response = mock(KoreaInvestmentPriceResponse.class);
-        when(response.isSuccess()).thenReturn(true);
-        when(response.getCurrentPrice()).thenReturn(new BigDecimal("76000"));
-        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(response);
+        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(new BigDecimal("76000"));
 
         portfolioScheduler.updateClosePrices();
 
@@ -169,17 +134,8 @@ class PortfolioSchedulerTest {
     @DisplayName("종가 갱신 - 여러 종목 업데이트")
     void updateClosePrices_multipleStocks_updatesAll() {
         when(portfolioRepository.findByActiveTrue()).thenReturn(List.of(portfolioSamsung, portfolioNaver));
-
-        KoreaInvestmentPriceResponse responseSamsung = mock(KoreaInvestmentPriceResponse.class);
-        when(responseSamsung.isSuccess()).thenReturn(true);
-        when(responseSamsung.getCurrentPrice()).thenReturn(new BigDecimal("76000"));
-
-        KoreaInvestmentPriceResponse responseNaver = mock(KoreaInvestmentPriceResponse.class);
-        when(responseNaver.isSuccess()).thenReturn(true);
-        when(responseNaver.getCurrentPrice()).thenReturn(new BigDecimal("330000"));
-
-        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(responseSamsung);
-        when(koreaInvestmentApiClient.getCurrentPrice("035420")).thenReturn(responseNaver);
+        when(koreaInvestmentApiClient.getCurrentPrice("005930")).thenReturn(new BigDecimal("76000"));
+        when(koreaInvestmentApiClient.getCurrentPrice("035420")).thenReturn(new BigDecimal("330000"));
 
         portfolioScheduler.updateClosePrices();
 

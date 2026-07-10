@@ -1,0 +1,7 @@
+{
+  "orderId": "TOSS-ORD-1001",
+  "status": "PENDING",
+  "message": "주문 접수됨",
+  "filledQuantity": "0",
+  "averageFillPrice": null
+}

@@ -13,8 +13,8 @@ import com.canagent.repository.TradeRepository;
 import com.canagent.port.BrokerPort;
 import com.canagent.port.MarketDataPort;
 import com.canagent.port.FinancialsPort;
+import com.canagent.port.dto.BrokerBalance;
 import com.canagent.service.PortfolioService;
-import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
 import com.canagent.worker.AutoTradingWorker;
 import com.canagent.worker.IntradayMonitorWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,7 +61,7 @@ public class DashboardController {
     // 한투 잔고조회 유량제한/순단으로 단발 실패 시 즉시 "연결 실패"로 뒤집히던 것을
     // 단기 캐시 + 재시도 + 마지막 성공값 폴백으로 견고화한다. (읽기 표시 경로 전용 — 워커 매매 경로 불변)
     private static final long BALANCE_CACHE_TTL_MS = 5_000;
-    private volatile KoreaInvestmentBalanceResponse cachedBalance;
+    private volatile BrokerBalance cachedBalance;
     private volatile long cachedBalanceAt;
 
     @Value("${trading.min-score:120}")
@@ -114,12 +114,12 @@ public class DashboardController {
         long availableCashAmount = 0;
         boolean accountConnected = false;
 
-        KoreaInvestmentBalanceResponse balanceResponse = fetchBalanceResilient();
-        if (balanceResponse != null && balanceResponse.isSuccess() && balanceResponse.getOutput2() != null
-                && !balanceResponse.getOutput2().isEmpty()) {
-            KoreaInvestmentBalanceResponse.AccountSummary summary = balanceResponse.getOutput2().get(0);
-            totalAssetAmount = parseLongSafe(summary.getTotalAssetAmount());
-            availableCashAmount = parseLongSafe(summary.getAvailableCashAmount());
+        // P6: 포트가 broker-중립 BrokerBalance를 반환. 표시 모델 속성명(totalAssetAmount/availableCashAmount)과
+        // long 타입은 종전과 동일 → dashboard.html 바인딩 무변경.
+        BrokerBalance balance = fetchBalanceResilient();
+        if (balance != null && balance.success()) {
+            totalAssetAmount = toLong(balance.totalEval());
+            availableCashAmount = toLong(balance.availableCash());
             accountConnected = true;
         }
 
@@ -196,25 +196,22 @@ public class DashboardController {
      * 3) 전부 실패하면 마지막 성공 잔고(있으면)를 폴백 반환 — 단발 순단으로 "연결 실패"가 뒤집히는 것을 막는다.
      * 매매 판단이 아닌 관측성 경로이므로 소폭 stale 값 허용.
      */
-    private KoreaInvestmentBalanceResponse fetchBalanceResilient() {
+    private BrokerBalance fetchBalanceResilient() {
         long now = System.currentTimeMillis();
-        KoreaInvestmentBalanceResponse cache = cachedBalance;
+        BrokerBalance cache = cachedBalance;
         if (cache != null && now - cachedBalanceAt < BALANCE_CACHE_TTL_MS) {
             return cache;
         }
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
-                KoreaInvestmentBalanceResponse res = koreaInvestmentApiClient.getBalance();
-                if (res != null && res.isSuccess() && res.getOutput2() != null && !res.getOutput2().isEmpty()) {
+                BrokerBalance res = koreaInvestmentApiClient.getBalance();
+                if (res != null && res.success()) {
                     cachedBalance = res;
                     cachedBalanceAt = System.currentTimeMillis();
                     return res;
                 }
-                log.warn("계좌 잔고 조회 비정상 응답 (시도 {}/2): rt_cd={}, msg_cd={}, msg1={}",
-                        attempt,
-                        res != null ? res.getRtCd() : "null",
-                        res != null ? res.getMsgCd() : "null",
-                        res != null ? res.getMsg1() : "null");
+                log.warn("계좌 잔고 조회 비정상 응답 (시도 {}/2): {}",
+                        attempt, res != null ? res.message() : "null");
             } catch (Exception e) {
                 log.warn("계좌 잔고 조회 예외 (시도 {}/2): {}", attempt, e.getMessage());
             }
@@ -231,15 +228,8 @@ public class DashboardController {
         return cachedBalance;
     }
 
-    private long parseLongSafe(String value) {
-        if (value == null || value.isBlank()) {
-            return 0;
-        }
-        try {
-            return Long.parseLong(value.replace(",", "").trim());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+    private long toLong(BigDecimal value) {
+        return value != null ? value.setScale(0, RoundingMode.FLOOR).longValue() : 0L;
     }
 
     @PostMapping("/trade/run")

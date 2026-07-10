@@ -1,0 +1,20 @@
+{
+  "availableCash": "1234.56",
+  "totalEvaluationAmount": "5678.90",
+  "holdings": [
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "quantity": "2.5",
+      "averageBuyPrice": "150.00",
+      "evaluationAmount": "380.00"
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft",
+      "quantity": "1.0",
+      "averageBuyPrice": "400.00",
+      "evaluationAmount": "410.00"
+    }
+  ]
+}
