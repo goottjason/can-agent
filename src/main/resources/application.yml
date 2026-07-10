@@ -58,10 +58,11 @@ toss:
 trading:
   scheduler:
     enabled: true
-    cron: "0 0 9 * * MON-FRI"              # 평일 오전 9시 (자동매매)
-    sync-cron: "0 30 15 * * MON-FRI"       # 평일 오후 3시 30분 (주가 동기화)
-    quarterly-cron: "0 0 10 1,4,7,10 *"    # 분기별 재무제표 동기화
-    monitor-cron: "0 */5 9-15 * * MON-FRI" # 장중 5분마다 실시간 모니터링
+    # 모든 크론 zone = America/New_York (ET). 미국 대전환(P7).
+    cron: "0 0 7 * * MON-FRI"              # 평일 오전 7시 ET (야간 점수 산출 — EDGAR 나이틀리 이후·개장 전)
+    sync-cron: "0 0 4 * * MON-FRI"         # 평일 오전 4시 ET (주가·재무 동기화 — SEC 나이틀리 ZIP 재컴파일 이후)
+    quarterly-cron: "0 0 10 1 1,4,7,10 *"  # 분기 시작월(1·4·7·10) 1일 오전 10시 ET (재무제표 동기화)
+    monitor-cron: "0 */5 9-15 * * MON-FRI" # 장중 5분마다 실시간 모니터링 (ET 정규장 09:30~16:00, 개장 게이트가 09:00~09:29 필터)
   max-positions: 10              # 최대 보유 종목 수
   position-rate: 10              # 종목당 최대 배분 비율 (%)
   stop-loss-rate: 7              # 손절 기준 (%)

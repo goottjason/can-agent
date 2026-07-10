@@ -38,11 +38,13 @@ public class AutoTradingWorker {
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
     }
 
-    @Scheduled(cron = "${trading.scheduler.cron:0 0 19 * * MON-FRI}", zone = "Asia/Seoul")
+    // 야간 점수 산출(E §5): EDGAR 나이틀리 배치(~03:00 ET 재컴파일)·재무 동기화(04:00 ET) 완료 후,
+    // 개장(09:30 ET) 전 07:00 ET에 전 종목 재분석 → 장중 모니터가 최신 점수를 소비.
+    @Scheduled(cron = "${trading.scheduler.cron:0 0 7 * * MON-FRI}", zone = "America/New_York")
     public void executeAnalysis() {
         log.info("===== 점수 저장 워커 시작 (전 종목 분석) =====");
 
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/New_York"));
         int savedCount = 0;
 
         try {

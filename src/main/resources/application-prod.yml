@@ -43,10 +43,11 @@ api:
 trading:
   scheduler:
     enabled: true
-    cron: "0 0 9 * * MON-FRI"
-    sync-cron: "0 30 15 * * MON-FRI"
-    quarterly-cron: "0 0 10 1,4,7,10 * *"
-    monitor-cron: "0 */5 9-15 * * MON-FRI"
+    # 모든 크론 zone = America/New_York (ET). 미국 대전환(P7).
+    cron: "0 0 7 * * MON-FRI"              # 오전 7시 ET (야간 점수 산출)
+    sync-cron: "0 0 4 * * MON-FRI"         # 오전 4시 ET (주가·재무 동기화 — SEC 나이틀리 이후)
+    quarterly-cron: "0 0 10 1 1,4,7,10 *"  # 분기 시작월 1일 오전 10시 ET (재무제표 동기화)
+    monitor-cron: "0 */5 9-15 * * MON-FRI" # 장중 5분마다 (ET 정규장 09:30~16:00)
   max-positions: 10
   position-rate: 10
   stop-loss-rate: 7

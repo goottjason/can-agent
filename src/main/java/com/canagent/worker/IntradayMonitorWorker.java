@@ -13,6 +13,7 @@ import com.canagent.repository.StockRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.canagent.port.BrokerPort;
 import com.canagent.port.dto.BrokerBalance;
+import com.canagent.service.MarketHours;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
 import com.canagent.service.analysis.CanSlimAnalysisService;
@@ -30,10 +31,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +53,7 @@ public class IntradayMonitorWorker {
     private final NotificationServiceRouter notificationServiceRouter;
     private final MonitorCheckLogRepository monitorCheckLogRepository;
     private final ObjectMapper objectMapper;
+    private final MarketHours marketHours;
 
     @Value("${trading.max-positions:10}")
     private int maxPositions;
@@ -81,7 +81,8 @@ public class IntradayMonitorWorker {
             TradingStrategyService tradingStrategyService,
             NotificationServiceRouter notificationServiceRouter,
             MonitorCheckLogRepository monitorCheckLogRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            MarketHours marketHours) {
         this.stockRepository = stockRepository;
         this.stockPriceRepository = stockPriceRepository;
         this.portfolioRepository = portfolioRepository;
@@ -93,13 +94,15 @@ public class IntradayMonitorWorker {
         this.notificationServiceRouter = notificationServiceRouter;
         this.monitorCheckLogRepository = monitorCheckLogRepository;
         this.objectMapper = objectMapper;
+        this.marketHours = marketHours;
     }
 
-    @Scheduled(cron = "${trading.scheduler.monitor-cron:0 */5 9-15 * * MON-FRI}", zone = "Asia/Seoul")
+    // ET 09:30~16:00 정규장. 09:00~09:29 틱은 isTradingHours(ET 개장) 게이트가 필터한다.
+    @Scheduled(cron = "${trading.scheduler.monitor-cron:0 */5 9-15 * * MON-FRI}", zone = "America/New_York")
     public void monitorTrading() {
-        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        LocalDateTime now = marketHours.nowEt();
 
-        if (!isTradingHours(now)) {
+        if (!marketHours.isTradingHours()) {
             return;
         }
 
@@ -135,8 +138,7 @@ public class IntradayMonitorWorker {
             funnel.signalCount = signalStocks.size();
 
             // 3단계: 매수 주문 실행
-            LocalDateTime checkTime = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
-            if (!signalStocks.isEmpty() && isTradingHours(checkTime)) {
+            if (!signalStocks.isEmpty() && marketHours.isTradingHours()) {
                 executeBuyOrders(signalStocks, funnel);
             } else if (!signalStocks.isEmpty()) {
                 log.info("장 마감으로 매수 건너뜀: {}건", signalStocks.size());
@@ -265,7 +267,7 @@ public class IntradayMonitorWorker {
     // ========== 2단계: 매수 대상 스캔 ==========
 
     private List<Stock> getTargetStocks() {
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        LocalDate today = marketHours.todayEt();
         // 하드 "어제" 대신 stock_prices 내 최신 완료 거래일(오늘 미만)을 기준으로 — 동기화 지연·휴장일에 견고.
         // 오늘 날짜는 장중 미완성 데이터이므로 제외한다.
         LocalDate baseDate = stockPriceRepository.findLatestTradeDateBefore(today).orElse(null);
@@ -292,21 +294,6 @@ public class IntradayMonitorWorker {
         return result;
     }
 
-    private boolean isTradingHours(LocalDateTime utcNow) {
-        java.time.ZoneId kst = java.time.ZoneId.of("Asia/Seoul");
-        LocalDateTime kstNow = utcNow.atZone(kst).toLocalDateTime();
-        LocalTime time = kstNow.toLocalTime();
-        LocalTime marketOpen = LocalTime.of(9, 0);
-        LocalTime marketClose = LocalTime.of(15, 30);
-
-        DayOfWeek dayOfWeek = kstNow.getDayOfWeek();
-        if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
-            return false;
-        }
-
-        return !time.isBefore(marketOpen) && !time.isAfter(marketClose);
-    }
-
     private void processStockForSignal(Stock stock, List<SignalStock> signalStocks, CheckFunnel funnel) {
         // P6: 포트가 broker-중립 BigDecimal 현재가 반환(실패/0은 priceFail 카운트). USD 센트 무손실.
         BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
@@ -329,7 +316,7 @@ public class IntradayMonitorWorker {
         CupAndHandleResult cupResult = cupAndHandleAnalyzer.analyze(stock);
 
         // 점수를 DB에 UPSERT (당일 기준)
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        LocalDate today = marketHours.todayEt();
         analysisScoreRepository.upsertScore(
                 stock.getId(),
                 today,
@@ -375,7 +362,7 @@ public class IntradayMonitorWorker {
             // 정식 OHLC·거래량은 캔들 동기화 경로(MarketDataPort)가 채운다(§4.1).
             StockPrice stockPrice = new StockPrice(
                     stock,
-                    LocalDate.now(java.time.ZoneId.of("Asia/Seoul")),
+                    marketHours.todayEt(),
                     currentPrice, currentPrice, currentPrice, currentPrice, 0L);
             stockPriceRepository.save(stockPrice);
         } catch (Exception e) {

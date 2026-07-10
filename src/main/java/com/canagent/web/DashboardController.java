@@ -14,6 +14,7 @@ import com.canagent.port.BrokerPort;
 import com.canagent.port.MarketDataPort;
 import com.canagent.port.FinancialsPort;
 import com.canagent.port.dto.BrokerBalance;
+import com.canagent.service.MarketHours;
 import com.canagent.service.PortfolioService;
 import com.canagent.worker.AutoTradingWorker;
 import com.canagent.worker.IntradayMonitorWorker;
@@ -52,9 +53,11 @@ public class DashboardController {
     private final MonitorCheckLogRepository monitorCheckLogRepository;
     private final AnalysisScoreRepository analysisScoreRepository;
     private final ObjectMapper objectMapper;
+    private final MarketHours marketHours;
 
-    private static final java.time.ZoneId KST = java.time.ZoneId.of("Asia/Seoul");
-    private static final int CHECK_INTERVAL_SECONDS = 300; // monitor-cron = 0 */5 9-15 * * MON-FRI
+    // 미국장 기준(P7). serverTime·장중 판정은 ET(America/New_York). 프론트 표시(monitor.js)는 클라이언트 로케일.
+    private static final java.time.ZoneId ET = java.time.ZoneId.of("America/New_York");
+    private static final int CHECK_INTERVAL_SECONDS = 300; // monitor-cron(ET) = 0 */5 9-15 * * MON-FRI
     private static final int STALE_THRESHOLD_SECONDS = 360; // 검사 6분 초과 시 '지연'
 
     // #1 계좌 "API 연결 실패" 완화: 대시보드는 SSR로 매 로드마다 잔고를 호출한다.
@@ -80,7 +83,8 @@ public class DashboardController {
             ApiConfig apiConfig,
             MonitorCheckLogRepository monitorCheckLogRepository,
             AnalysisScoreRepository analysisScoreRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            MarketHours marketHours) {
         this.portfolioRepository = portfolioRepository;
         this.tradeRepository = tradeRepository;
         this.portfolioService = portfolioService;
@@ -93,6 +97,7 @@ public class DashboardController {
         this.monitorCheckLogRepository = monitorCheckLogRepository;
         this.analysisScoreRepository = analysisScoreRepository;
         this.objectMapper = objectMapper;
+        this.marketHours = marketHours;
     }
 
     @GetMapping("/")
@@ -282,8 +287,8 @@ public class DashboardController {
     @GetMapping("/api/monitor/status")
     @ResponseBody
     public Map<String, Object> getMonitorStatus() {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now(KST);
-        boolean tradingHours = isTradingHours(now);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(ET);
+        boolean tradingHours = marketHours.isTradingHours();
         boolean monitoring = intradayMonitorWorker != null && intradayMonitorWorker.isMonitoring();
 
         MonitorCheckLog latest = monitorCheckLogRepository.findTopByOrderByCheckTimeDesc().orElse(null);
@@ -393,12 +398,4 @@ public class DashboardController {
         }
     }
 
-    private boolean isTradingHours(java.time.LocalDateTime kstNow) {
-        java.time.DayOfWeek dow = kstNow.getDayOfWeek();
-        if (dow == java.time.DayOfWeek.SATURDAY || dow == java.time.DayOfWeek.SUNDAY) {
-            return false;
-        }
-        java.time.LocalTime t = kstNow.toLocalTime();
-        return !t.isBefore(java.time.LocalTime.of(9, 0)) && !t.isAfter(java.time.LocalTime.of(15, 30));
-    }
 }

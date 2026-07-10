@@ -28,7 +28,8 @@ public class PortfolioScheduler {
         this.koreaInvestmentApiClient = koreaInvestmentApiClient;
     }
 
-    @Scheduled(cron = "${trading.scheduler.price-cron:0 */5 9-15 * * MON-FRI}", zone = "Asia/Seoul")
+    // 장중 현재가 갱신: ET 정규장 시간대 5분마다(09:00~09:29 틱은 실질 무해 — 종가/현재가 표시 갱신용).
+    @Scheduled(cron = "${trading.scheduler.price-cron:0 */5 9-15 * * MON-FRI}", zone = "America/New_York")
     @Transactional
     public void updatePortfolioPrices() {
         log.debug("포트폴리오 현재가 갱신 시작");
@@ -56,7 +57,8 @@ public class PortfolioScheduler {
         log.debug("포트폴리오 현재가 갱신 완료: {}건 갱신", updatedCount);
     }
 
-    @Scheduled(cron = "${trading.scheduler.close-price-cron:0 0 16 * * MON-FRI}", zone = "Asia/Seoul")
+    // 종가 갱신: ET 정규장 마감 16:00에 최종가 확정.
+    @Scheduled(cron = "${trading.scheduler.close-price-cron:0 0 16 * * MON-FRI}", zone = "America/New_York")
     @Transactional
     public void updateClosePrices() {
         log.info("장 마감 후 포트폴리오 종가 갱신 시작");

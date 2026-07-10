@@ -50,19 +50,19 @@
                     <h3>핵심 흐름</h3>
                     <div class="flow-diagram">
                         <strong>1단계: 데이터 수집</strong><br>
-                        <span class="tag tag-blue">매일 15:30 KST</span> 장 마감 후 가격 데이터 동기화<br>
+                        <span class="tag tag-blue">매일 04:00 ET</span> SEC 나이틀리 배치 이후 가격·재무 데이터 동기화<br>
                         <span class="tag tag-green">분기별</span> DART 재무제표 수집 → 금융지표 계산<br><br>
 
                         <span class="arrow">▼</span><br><br>
 
                         <strong>2단계: 점수 산출</strong><br>
-                        <span class="tag tag-yellow">매일 19:00 KST</span> 전체 활성 종목 CANSLIM + 컵앤핸들 분석<br>
+                        <span class="tag tag-yellow">매일 07:00 ET</span> 전체 활성 종목 CANSLIM + 컵앤핸들 분석<br>
                         → <code>analysis_scores</code> 테이블에 종목별 일일 점수 저장 (UPSERT)<br><br>
 
                         <span class="arrow">▼</span><br><br>
 
                         <strong>3단계: 장중 모니터링</strong><br>
-                        <span class="tag tag-red">09:00~15:30 KST</span> 5분마다 순환<br>
+                        <span class="tag tag-red">09:30~16:00 ET</span> 5분마다 순환<br>
                         &nbsp;&nbsp;① 보유 종목 매도 체크 (손절·익절·점수하락)<br>
                         &nbsp;&nbsp;② ~400종목 스캔 → 매수 신호 탐지<br>
                         &nbsp;&nbsp;③ 매수 주문 실행 (최대 3회 재시도)<br>
@@ -93,11 +93,11 @@
                     <div class="highlight">
                         <strong>운영 서버:</strong> <code>http://168.107.31.154/can-agent</code><br>
                         <strong>프로필:</strong> <code>prod</code> (PostgreSQL + Telegram 알림 활성화)<br>
-                        <strong>시간대:</strong> 모든 스케줄은 <code>zone = "Asia/Seoul"</code>로 KST 기준 동작
+                        <strong>시간대:</strong> 모든 스케줄은 <code>zone = "America/New_York"</code>로 ET(미국 동부, DST 자동) 기준 동작
                     </div>
                     <div class="warn">
-                        <strong>주의:</strong> 서버 시간은 UTC이지만, 모든 스케줄러는 KST(UTC+9)로 변환 후 실행됩니다.<br>
-                        <code>LocalDateTime.now()</code> 호출 시 반드시 KST 변환 필요.
+                        <strong>주의:</strong> 서버 시간은 UTC이지만, 모든 스케줄러는 ET(America/New_York, DST 자동)로 변환 후 실행됩니다.<br>
+                        <code>LocalDateTime.now()</code> 호출 시 반드시 ET 변환 필요.
                     </div>
                 </div>
             </div>

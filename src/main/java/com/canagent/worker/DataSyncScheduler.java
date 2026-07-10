@@ -17,7 +17,7 @@ import java.time.ZoneId;
 public class DataSyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DataSyncScheduler.class);
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final ZoneId ET = ZoneId.of("America/New_York");
 
     // P5: price 동기화 의존을 구체 KrxDataSyncService → MarketDataPort로 전환(P1 디커플 완성).
     // 유일 구현은 TossMarketDataAdapter. 구현·모킹 교체가 가능해진다.
@@ -31,11 +31,12 @@ public class DataSyncScheduler {
         this.financialsPort = financialsPort;
     }
 
-    @Scheduled(cron = "${trading.scheduler.sync-cron:0 30 15 * * MON-FRI}", zone = "Asia/Seoul")
+    // 재무·주가 동기화(E §5): SEC 나이틀리 companyfacts ZIP 재컴파일(~03:00 ET) 이후인 04:00 ET에 실행.
+    @Scheduled(cron = "${trading.scheduler.sync-cron:0 0 4 * * MON-FRI}", zone = "America/New_York")
     public void syncDailyData() {
         log.info("===== 일일 데이터 동기화 시작 =====");
 
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now(ET);
         if (isWeekend(today)) {
             log.info("주말은 동기화 스킵");
             return;
@@ -54,11 +55,12 @@ public class DataSyncScheduler {
         log.info("===== 일일 데이터 동기화 종료 =====");
     }
 
-    @Scheduled(cron = "${trading.scheduler.quarterly-cron:0 0 10 1 1,4,7,10 *}", zone = "Asia/Seoul")
+    // 분기 재무(E §5): SEC 10-Q/10-K 제출주기 기준. 분기 시작월(1·4·7·10) 1일 10:00 ET에 재컴파일.
+    @Scheduled(cron = "${trading.scheduler.quarterly-cron:0 0 10 1 1,4,7,10 *}", zone = "America/New_York")
     public void syncQuarterlyFinancials() {
         log.info("===== 분기 재무제표 동기화 시작 =====");
 
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now(ET);
         String year = String.valueOf(today.getYear());
         String quarter = getQuarter(today);
 
@@ -83,7 +85,7 @@ public class DataSyncScheduler {
         try {
             // P5: 포트 경유로 전환. 거래일수를 달력 기간으로 환산(주말·휴장 여유 ×1.6)해
             // 백필 시작일을 산출 → 어댑터가 종목별 캔들 페이지네이션으로 채운다.
-            LocalDate endDate = LocalDate.now(KST);
+            LocalDate endDate = LocalDate.now(ET);
             LocalDate startDate = endDate.minusDays((long) (tradingDays * 1.6));
             int count = marketDataPort.syncAllActiveStocks(startDate, endDate);
             log.info("벌크 주가 동기화 완료: {}건 저장 ({}~{})", count, startDate, endDate);
@@ -98,7 +100,7 @@ public class DataSyncScheduler {
             // EDGAR companyfacts는 1회 호출로 전체 히스토리를 반환하므로 분기 루프가 불필요하다.
             // quarters를 "몇 년치 하한"으로 환산해 힌트로 전달(quarter 파라미터는 EDGAR가 무시).
             int yearsBack = Math.max(1, (quarters + 3) / 4);
-            String startYear = String.valueOf(LocalDate.now(KST).getYear() - yearsBack);
+            String startYear = String.valueOf(LocalDate.now(ET).getYear() - yearsBack);
             int count = financialsPort.syncAllActiveStocks(startYear, null);
             log.info("벌크 재무 동기화 완료: {}건 저장 (startYear={})", count, startYear);
         } catch (Exception e) {
