@@ -26,8 +26,11 @@ public class TossTokenProvider {
 
     /** 만료 몇 초 전에 선제 갱신할지(캐시된 토큰 조기 무효화 버퍼). */
     private static final int REFRESH_BUFFER_SECONDS = 300;
-    /** 응답에 expires_in이 없을 때의 보수적 기본값(초). B실사 힌트 1시간 만료 가정. */
-    private static final int DEFAULT_EXPIRES_IN = 3600;
+    /**
+     * 응답에 expires_in이 없을 때의 보수적 기본값(초).
+     * === PoC 확정(2026-07-11, §1) ===: 실제 expires_in=86399(≈24h). 응답값이 오면 그걸 쓰고, 부재 시 이 24h 폴백.
+     */
+    private static final int DEFAULT_EXPIRES_IN = 86399;
 
     private final RestTemplate restTemplate;
     private final TossProperties props;
@@ -67,7 +70,7 @@ public class TossTokenProvider {
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.postForObject(url, request, Map.class);
-            // === PoC 미확정 매핑(응답 필드): access_token / expires_in 가정 ===
+            // === PoC 확정(2026-07-11, §1): 토큰 응답은 result 래핑 없이 최상위 access_token/token_type/expires_in ===
             if (response != null && response.containsKey("access_token")) {
                 accessToken = String.valueOf(response.get("access_token"));
                 int expiresIn = toInt(response.get("expires_in"), DEFAULT_EXPIRES_IN);

@@ -6,7 +6,8 @@ import java.util.List;
 /**
  * 계좌 잔고(broker-중립).
  *
- * <p>P6(미국 대전환): KIS {@code output2}(예수금·평가)·{@code output1}(보유목록) 및 토스 assets 응답을
+ * <p>P6(미국 대전환): KIS {@code output2}(예수금·평가)·{@code output1}(보유목록) 및 토스
+ * {@code buying-power}(cashBuyingPower)+{@code holdings}(P6b PoC 확정) 응답을
  * 이 타입으로 흡수한다. 사이징은 {@link #availableCash()}(주문 가능 현금)를 기준으로 한다(E §3).
  *
  * <p>필드명은 시장중립: KIS는 KRW 예수금(출금가능금액), 토스 US는 USD 현금을 담는다.

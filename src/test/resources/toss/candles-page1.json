@@ -1,8 +1,10 @@
 {
-  "candles": [
-    {"timestamp": "2024-03-15T00:00:00Z", "openPrice": "170.00", "highPrice": "172.50", "lowPrice": "169.80", "closePrice": "171.20", "volume": "52000000", "currency": "USD"},
-    {"timestamp": "2024-03-14T00:00:00Z", "openPrice": "168.00", "highPrice": "170.10", "lowPrice": "167.50", "closePrice": "169.90", "volume": "48000000", "currency": "USD"},
-    {"timestamp": "2024-03-13T00:00:00Z", "openPrice": "165.30", "highPrice": "168.20", "lowPrice": "165.00", "closePrice": "168.00", "volume": "51000000", "currency": "USD"}
-  ],
-  "nextBefore": "2024-03-13T00:00:00Z"
+  "result": {
+    "candles": [
+      {"timestamp": "2024-03-15T00:00:00+09:00", "openPrice": "170.00", "highPrice": "172.50", "lowPrice": "169.80", "closePrice": "171.20", "volume": "52000000", "currency": "USD"},
+      {"timestamp": "2024-03-14T00:00:00+09:00", "openPrice": "168.00", "highPrice": "170.10", "lowPrice": "167.50", "closePrice": "169.90", "volume": "48000000", "currency": "USD"},
+      {"timestamp": "2024-03-13T00:00:00+09:00", "openPrice": "165.30", "highPrice": "168.20", "lowPrice": "165.00", "closePrice": "168.00", "volume": "51000000", "currency": "USD"}
+    ],
+    "nextBefore": "2024-03-13T00:00:00+09:00"
+  }
 }

@@ -1,7 +1,6 @@
 {
-  "orderId": "TOSS-ORD-1001",
-  "status": "PENDING",
-  "message": "주문 접수됨",
-  "filledQuantity": "0",
-  "averageFillPrice": null
+  "result": {
+    "orderId": "TOSS-ORD-1001",
+    "clientOrderId": "b3f1c0de-0000-0000-0000-000000000001"
+  }
 }

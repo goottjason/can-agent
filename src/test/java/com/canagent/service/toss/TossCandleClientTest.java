@@ -66,7 +66,23 @@ class TossCandleClientTest {
         assertThat(first.getClose()).isEqualByComparingTo(new BigDecimal("171.20"));
         assertThat(first.getVolume()).isEqualTo(52000000L);
         assertThat(page.hasMore()).isTrue();
-        assertThat(page.getNextBefore()).isEqualTo("2024-03-13T00:00:00Z");
+        // === PoC 확정(2026-07-11, §7): result.nextBefore 언랩(루트 아님). timestamp는 ISO8601 +09:00. ===
+        assertThat(page.getNextBefore()).isEqualTo("2024-03-13T00:00:00+09:00");
+    }
+
+    @Test
+    @DisplayName("result 언랩 회귀: 루트 파싱이면 시세 0건(조용실패) — result.candles를 읽어야 3건")
+    void unwrapsResultEnvelope() throws Exception {
+        TossCandleClient client = new TossCandleClient(restTemplate, props(), tokenProvider);
+        when(tokenProvider.getAccessToken()).thenReturn("TOK");
+        when(restTemplate.exchange(any(String.class), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(fixture("candles-page1.json")));
+
+        TossCandlePage page = client.getDailyCandles("AAPL", 200, null);
+
+        // 실 응답은 {"result":{"candles":[...]}} — 루트에서 candles를 찾으면 0건이 되어 시세동기화가 조용히 멈춘다.
+        assertThat(page.getCandles()).isNotEmpty();
+        assertThat(page.getNextBefore()).isNotNull();
     }
 
     @Test

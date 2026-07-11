@@ -6,8 +6,8 @@ import java.math.BigDecimal;
  * 주문 체결 상태(broker-중립) — 상세조회 결과.
  *
  * <p>P6(미국 대전환): 토스 주문상세(status/체결수량/평균체결가/수수료/세금)와 KIS 체결조회를 흡수한다.
- * status enum은 토스 실사(B §1) 값집합을 그대로 채택한다(PENDING/PARTIAL_FILLED/PENDING_CANCEL/
- * PENDING_REPLACE/CLOSED). 알 수 없는 값은 {@link Status#UNKNOWN}으로 견고 매핑.
+ * status enum은 토스 PoC 실확정(2026-07-11, §9) OrderStatus 값집합을 그대로 채택한다. 알 수 없는
+ * 값은 {@link Status#UNKNOWN}으로 견고 매핑.
  *
  * @param orderId      브로커 주문번호
  * @param status       체결 상태
@@ -27,13 +27,22 @@ public record OrderStatus(
         String message
 ) {
 
-    /** 토스 주문 상태(B실사 §1 값집합). */
+    /**
+     * 토스 주문 상태.
+     * === PoC 확정(2026-07-11, §9) ===: OrderStatus 실제 enum 값집합.
+     * (우리 {@code CLOSED}는 실제 없음 → {@code FILLED}로 교체, CANCELED/REJECTED 등 추가.)
+     */
     public enum Status {
         PENDING,
-        PARTIAL_FILLED,
         PENDING_CANCEL,
         PENDING_REPLACE,
-        CLOSED,
+        PARTIAL_FILLED,
+        FILLED,
+        CANCELED,
+        REJECTED,
+        CANCEL_REJECTED,
+        REPLACE_REJECTED,
+        REPLACED,
         UNKNOWN
     }
 

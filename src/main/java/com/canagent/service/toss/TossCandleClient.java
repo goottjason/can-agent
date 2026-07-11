@@ -30,10 +30,11 @@ import java.util.List;
  * {@code before}(ISO8601 커서) 페이지네이션 + 응답 {@code nextBefore}. Bearer 토큰 헤더는
  * {@link TossTokenProvider}에서 요청 단위로만 부착(공유 RestTemplate 오염 방지, EdgarClient 선례).
  *
- * <p><b>openapi.json 확정(2026-07-09)</b>: 쿼리 {@code symbol/interval/count/before}, 캔들별
- * {@code timestamp/openPrice/highPrice/lowPrice/closePrice/volume}, 커서 {@code nextBefore}로 교정됨.
- * 남은 미확정(샌드박스 확정): 응답 envelope 래핑 키(배열 직접 vs candles 래핑 — parse가 양쪽 견고 처리),
- * {@code timestamp} 타입(ISO8601 vs epoch — mapCandle이 양쪽 처리). 매핑은 이 파일 한 곳에 집중.
+ * <p><b>=== PoC 확정(2026-07-11, §7) ===</b>: 응답은 {@code {"result":{"candles":[...],"nextBefore":...}}}로
+ * 래핑된다. 이전엔 {@code candles}/{@code nextBefore}를 <b>루트</b>에서 찾아 실제 응답에선 빈 배열→시세동기화
+ * 0건 <b>조용한 실패</b>였다(🔴 확정 버그). 이제 {@code result}를 벗긴 뒤 {@code candles}/{@code nextBefore}를 읽는다.
+ * 쿼리 {@code symbol/interval/count/before[&adjusted=true]}, 캔들별
+ * {@code timestamp(ISO8601 +09:00)/openPrice/highPrice/lowPrice/closePrice/volume/currency}. 매핑은 이 파일 한 곳에 집중.
  */
 @Component
 public class TossCandleClient {
@@ -52,8 +53,9 @@ public class TossCandleClient {
     private static final String PARAM_COUNT = "count";
     private static final String PARAM_BEFORE = "before";
 
-    // === openapi.json 확정(2026-07-09): 응답 JSON 필드명 ===
-    // 캔들별: timestamp/openPrice/highPrice/lowPrice/closePrice/volume/currency, 커서 nextBefore.
+    // === PoC 확정(2026-07-11, §7): 응답 JSON 필드명 ===
+    // 성공 응답은 최상위 result 래핑, 그 안에 candles/nextBefore. 캔들별: timestamp/openPrice/highPrice/lowPrice/closePrice/volume/currency.
+    private static final String FIELD_RESULT = "result";
     private static final String FIELD_CANDLES = "candles";
     private static final String FIELD_NEXT_BEFORE = "nextBefore";
     private static final String FIELD_TIMESTAMP = "timestamp";
@@ -138,11 +140,13 @@ public class TossCandleClient {
 
     /**
      * 응답 JSON → TossCandlePage. 필드 부재/파싱 실패 캔들은 건너뛴다(견고).
-     * 응답 envelope는 배열 직접(`[{...}]`) 또는 래핑(`{"candles":[...],"nextBefore":...}`) 양쪽을 견고 처리
-     * (openapi.json이 캔들별 필드는 확정했으나 envelope 래핑 키는 미명시 — 샌드박스 확정 대상).
+     * === PoC 확정(2026-07-11, §7) ===: 성공 응답 {@code {"result":{"candles":[...],"nextBefore":...}}}에서
+     * {@code result}를 벗긴 뒤 {@code candles}/{@code nextBefore}를 읽는다. result 부재 시 루트에서 폴백해도
+     * 캔들 배열이 없으면 빈 페이지 → 상위 루프 종료(무한루프 방지).
      */
     private TossCandlePage parse(JsonNode root, String ticker) {
-        JsonNode arr = root.isArray() ? root : root.path(FIELD_CANDLES);
+        JsonNode body = root.has(FIELD_RESULT) ? root.path(FIELD_RESULT) : root;
+        JsonNode arr = body.path(FIELD_CANDLES);
         List<TossCandle> candles = new ArrayList<>();
         if (arr.isArray()) {
             for (Iterator<JsonNode> it = arr.elements(); it.hasNext(); ) {
@@ -150,7 +154,7 @@ public class TossCandleClient {
                 if (c != null) candles.add(c);
             }
         }
-        String nextBefore = root.path(FIELD_NEXT_BEFORE).asText(null);
+        String nextBefore = body.path(FIELD_NEXT_BEFORE).asText(null);
         if (nextBefore != null && nextBefore.isBlank()) nextBefore = null;
         return new TossCandlePage(candles, nextBefore);
     }

@@ -1,0 +1,36 @@
+{
+  "result": {
+    "totalPurchaseAmount": {"krw": "8000000", "usd": "5600.00"},
+    "marketValue": {"amount": {"krw": "8112700", "usd": "5678.90"}, "amountAfterCost": {"krw": "8100000", "usd": "5670.00"}},
+    "profitLoss": {"amount": {"krw": "112700", "usd": "78.90"}, "amountAfterCost": {"krw": "100000", "usd": "70.00"}, "rate": "0.014", "rateAfterCost": "0.012"},
+    "dailyProfitLoss": {"amount": {"krw": "5000", "usd": "3.50"}, "rate": "0.001"},
+    "items": [
+      {
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "marketCountry": "US",
+        "currency": "USD",
+        "quantity": "2.5",
+        "lastPrice": "152.00",
+        "averagePurchasePrice": "150.00",
+        "marketValue": {"amount": {"krw": "542400", "usd": "380.00"}},
+        "profitLoss": {"amount": {"krw": "7140", "usd": "5.00"}, "rate": "0.013"},
+        "dailyProfitLoss": {"amount": {"krw": "2000", "usd": "1.40"}},
+        "cost": {"krw": "535000", "usd": "375.00"}
+      },
+      {
+        "symbol": "MSFT",
+        "name": "Microsoft",
+        "marketCountry": "US",
+        "currency": "USD",
+        "quantity": "1.0",
+        "lastPrice": "410.00",
+        "averagePurchasePrice": "400.00",
+        "marketValue": {"amount": {"krw": "585400", "usd": "410.00"}},
+        "profitLoss": {"amount": {"krw": "14280", "usd": "10.00"}, "rate": "0.025"},
+        "dailyProfitLoss": {"amount": {"krw": "3000", "usd": "2.10"}},
+        "cost": {"krw": "571000", "usd": "400.00"}
+      }
+    ]
+  }
+}

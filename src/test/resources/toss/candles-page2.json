@@ -1,7 +1,9 @@
 {
-  "candles": [
-    {"timestamp": "2024-03-12T00:00:00Z", "openPrice": "163.00", "highPrice": "165.50", "lowPrice": "162.80", "closePrice": "165.30", "volume": "47000000", "currency": "USD"},
-    {"timestamp": "2024-03-11T00:00:00Z", "openPrice": "160.10", "highPrice": "163.30", "lowPrice": "159.90", "closePrice": "163.00", "volume": "49000000", "currency": "USD"}
-  ],
-  "nextBefore": null
+  "result": {
+    "candles": [
+      {"timestamp": "2024-03-12T00:00:00+09:00", "openPrice": "163.00", "highPrice": "165.50", "lowPrice": "162.80", "closePrice": "165.30", "volume": "47000000", "currency": "USD"},
+      {"timestamp": "2024-03-11T00:00:00+09:00", "openPrice": "160.10", "highPrice": "163.30", "lowPrice": "159.90", "closePrice": "163.00", "volume": "49000000", "currency": "USD"}
+    ],
+    "nextBefore": null
+  }
 }

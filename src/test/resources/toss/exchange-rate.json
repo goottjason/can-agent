@@ -1,5 +1,10 @@
 {
-  "base": "USD",
-  "quote": "KRW",
-  "rate": "1385.50"
+  "result": {
+    "rate": "1506.90",
+    "midRate": "1506.50",
+    "basisPoint": "10",
+    "rateChangeType": "UP",
+    "validFrom": "2024-03-15T09:00:00+09:00",
+    "validUntil": "2024-03-15T18:00:00+09:00"
+  }
 }
