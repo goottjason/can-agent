@@ -1,0 +1,19 @@
+{
+  "result": {
+    "today": {
+      "date": "2026-07-10",
+      "dayMarket": {"startTime": "2026-07-10T09:00:00.000+09:00", "endTime": "2026-07-10T17:00:00.000+09:00"},
+      "preMarket": {"startTime": "2026-07-10T18:00:00.000+09:00", "endTime": "2026-07-10T22:30:00.000+09:00"},
+      "regularMarket": {"startTime": "2026-07-10T22:30:00.000+09:00", "endTime": "2026-07-11T05:00:00.000+09:00"},
+      "afterMarket": {"startTime": "2026-07-11T05:00:00.000+09:00", "endTime": "2026-07-11T09:00:00.000+09:00"}
+    },
+    "previousBusinessDay": {
+      "date": "2026-07-09",
+      "regularMarket": {"startTime": "2026-07-09T22:30:00.000+09:00", "endTime": "2026-07-10T05:00:00.000+09:00"}
+    },
+    "nextBusinessDay": {
+      "date": "2026-07-13",
+      "regularMarket": {"startTime": "2026-07-13T22:30:00.000+09:00", "endTime": "2026-07-14T05:00:00.000+09:00"}
+    }
+  }
+}

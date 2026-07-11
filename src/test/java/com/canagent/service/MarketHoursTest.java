@@ -1,8 +1,11 @@
 package com.canagent.service;
 
+import com.canagent.config.TossProperties;
+import com.canagent.config.TossTokenProvider;
 import com.canagent.port.MarketCalendarPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -18,9 +21,18 @@ class MarketHoursTest {
 
     private static final ZoneId ET = ZoneId.of("America/New_York");
 
-    /** 실제 어댑터를 소비해 워커·컨트롤러와 동일 판정을 보장(단일 진실 회귀 방지). */
+    /**
+     * 실제 어댑터를 소비해 워커·컨트롤러와 동일 판정을 보장(단일 진실 회귀 방지).
+     * #5(2026-07-11): 어댑터가 토스 캘린더 실연동으로 바뀌어 협력자를 요구한다. 여기선 토큰을 null로 반환하는
+     * TossTokenProvider를 주입해 API를 타지 않고 정적 NYSE 폴백 경로로 판정하게 한다(이 테스트의 기존 의도인
+     * ET 정규장·휴일 규칙 검증을 그대로 유지). RestTemplate은 호출되지 않으므로 스텁 없는 목이면 충분하다.
+     */
     private MarketCalendarPort port() {
-        return new com.canagent.service.toss.TossMarketCalendarAdapter();
+        RestTemplate restTemplate = org.mockito.Mockito.mock(RestTemplate.class);
+        TossProperties props = new TossProperties();
+        TossTokenProvider tokenProvider = org.mockito.Mockito.mock(TossTokenProvider.class);
+        org.mockito.Mockito.when(tokenProvider.getAccessToken()).thenReturn(null);
+        return new com.canagent.service.toss.TossMarketCalendarAdapter(restTemplate, props, tokenProvider);
     }
 
     private MarketHours atEt(int y, int mo, int d, int h, int mi) {

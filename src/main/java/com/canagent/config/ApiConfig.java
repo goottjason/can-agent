@@ -3,40 +3,19 @@ package com.canagent.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * 외부 API 설정. #6 잔재 정리(2026-07-11): 미국 대전환으로 데이터 소스가 SEC EDGAR·토스로 이동해
+ * KRX/DART 중첩 프로퍼티(getKey → env DART_API_KEY/KRX_API_KEY)는 참조 0의 데드 코드가 되어 제거했다.
+ * 재무는 {@code EdgarProperties}, 시세·주문은 {@code TossProperties}가 담당한다.
+ * <b>한투(korea-investment) 프로퍼티는 폴백 broker(BrokerPort)로 유지한다</b>(토스 비활성 시 단독 사용).
+ */
 @Configuration
 @ConfigurationProperties(prefix = "api")
 public class ApiConfig {
 
-    private Dart dart = new Dart();
-    private Krx krx = new Krx();
     private KoreaInvestment koreaInvestment = new KoreaInvestment();
 
-    public Dart getDart() { return dart; }
-    public Krx getKrx() { return krx; }
     public KoreaInvestment getKoreaInvestment() { return koreaInvestment; }
-
-    public static class Dart {
-        private String key;
-        private String baseUrl = "https://opendart.fss.or.kr/api";
-
-        public String getKey() { return env("DART_API_KEY", key); }
-        public void setKey(String key) { this.key = key; }
-        public String getBaseUrl() { return baseUrl; }
-        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-    }
-
-    public static class Krx {
-        private String key;
-        private String baseUrl = "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService";
-        private String stockListUrl = "https://apis.data.go.kr/1160100/service/GetKrxListedInfoService/getItemInfo";
-
-        public String getKey() { return env("KRX_API_KEY", key); }
-        public void setKey(String key) { this.key = key; }
-        public String getBaseUrl() { return baseUrl; }
-        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-        public String getStockListUrl() { return stockListUrl; }
-        public void setStockListUrl(String stockListUrl) { this.stockListUrl = stockListUrl; }
-    }
 
     public static class KoreaInvestment {
         private String appKey;
