@@ -30,10 +30,6 @@ server:
 
 # 외부 API 설정
 api:
-  dart:
-    key: ${DART_API_KEY:}
-  krx:
-    key: ${KRX_API_KEY:}
   korea-investment:
     app-key: ${KOREA_INVESTMENT_APP_KEY:}
     app-secret: ${KOREA_INVESTMENT_APP_SECRET:}
@@ -46,7 +42,7 @@ edgar:
   base-url: "${EDGAR_BASE_URL:https://data.sec.gov}"
   min-interval-ms: 125
 
-# 토스증권 Open API (P5: 미국 시세/캔들, P6: 주문 공용). 한투/DART/KRX 키는 유지(P9).
+# 토스증권 Open API (P5: 미국 시세/캔들, P6: 주문 공용). 한투 키는 폴백 broker용으로 유지(P9).
 # token-url·캔들 필드명은 PoC 미확정 — 실호출로 확정 시 값만 교체.
 toss:
   app-key: "${TOSS_APP_KEY:}"
@@ -82,8 +78,5 @@ notification:
     enabled: false
     bot-token: ${TELEGRAM_BOT_TOKEN:}
     chat-id: ${TELEGRAM_CHAT_ID:}
-  kakao:
-    enabled: false
-    webhook-url: ${KAKAO_WEBHOOK_URL:}
   console:
     enabled: true                # 콘솔 로그 알림 (항상 권장)

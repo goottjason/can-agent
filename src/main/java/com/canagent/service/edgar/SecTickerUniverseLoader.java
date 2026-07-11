@@ -18,7 +18,7 @@ import java.util.Map;
  * SEC {@code company_tickers.json} → Stock 마스터 upsert 로더.
  *
  * <p>JSON 포맷(SEC): {@code { "0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}, ... }}.
- * corp_code_map.json(6자리→corp_code)을 대체하는 US 식별 소스이나, 기존 파일/KrxCorpDTO는 <b>삭제하지 않는다</b>(P9 소관).
+ * (구)corp_code_map.json(6자리→corp_code)을 대체하는 US 식별 소스. 그 국내 매핑 파일/DTO는 P9에서 삭제됐다.
  *
  * <p>ticker→Stock 매칭으로 upsert하며 {@code applyUsIdentifiers}로 cik/ticker/exchange/currency를 채운다.
  * exchange는 이 파일에 없어 null(후속: SEC {@code company_tickers_exchange.json} 병합).

@@ -15,15 +15,14 @@ import java.util.List;
 /**
  * 토스 캔들 기반 {@link MarketDataPort} 구현 — <b>유일한 MarketDataPort 빈</b>.
  *
- * <p>P5: {@code KrxDataSyncService}에서 {@code implements MarketDataPort}가 제거되어(클래스는 P9까지 유지),
- * DashboardController(P1부터 포트 주입)·DataSyncScheduler(P5에서 포트로 전환)의 MarketDataPort 주입은
- * 자동으로 이 어댑터를 사용한다(시그니처 불변).
+ * <p>DashboardController(P1부터 포트 주입)·DataSyncScheduler(P5에서 포트로 전환)의 MarketDataPort 주입은
+ * 이 어댑터를 사용한다(시그니처 불변). (구)KRX 동기화 클래스는 P9에서 삭제됨.
  *
  * <p><b>fetch 루프 역전</b>: KRX는 "날짜별 전종목 배치"였으나, 토스 캔들은 종목별 조회이므로
  * "종목별 캔들 페이지네이션"으로 뒤집는다. active + ticker 보유 종목 각각에 대해 최신부터
  * {@code before} 커서로 과거로 백필하며 {@code startDate}에 도달하면 멈춘다.
  *
- * <p>영속화(생성·중복체크·저장)는 {@link StockPriceUpserter}로 공유(KrxDataSyncService의 패턴 추출).
+ * <p>영속화(생성·중복체크·저장)는 {@link StockPriceUpserter}로 공유.
  */
 @Service
 public class TossMarketDataAdapter implements MarketDataPort {

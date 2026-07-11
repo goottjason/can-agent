@@ -36,10 +36,6 @@ server:
 
 # 외부 API 설정
 api:
-  dart:
-    key: ${DART_API_KEY}
-  krx:
-    key: ${KRX_API_KEY}
   korea-investment:
     app-key: ${KOREA_INVESTMENT_APP_KEY}
     app-secret: ${KOREA_INVESTMENT_APP_SECRET}
@@ -70,8 +66,5 @@ notification:
     enabled: true
     bot-token: ${TELEGRAM_BOT_TOKEN:}
     chat-id: ${TELEGRAM_CHAT_ID:}
-  kakao:
-    enabled: true
-    webhook-url: ${KAKAO_WEBHOOK_URL:}
   console:
     enabled: false

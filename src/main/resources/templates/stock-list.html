@@ -48,7 +48,7 @@
             <div class="container">
                 <header>
                     <h1>종목 관리</h1>
-                    <p class="subtitle">KRX 상장종목 검색, 등록, 관리</p>
+                    <p class="subtitle">미국 상장종목 검색, 등록, 관리</p>
                 </header>
 
                 <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
@@ -84,19 +84,11 @@
                 <div class="action-bar">
                     <button class="btn btn-success" onclick="openRegisterModal()"
                             title="종목 코드·이름·시장을 직접 입력해 관리 대상 종목 하나를 등록합니다.">+ 종목 등록</button>
-                    <form th:action="@{/stocks/preset}" method="post" class="inline-form">
-                        <button type="submit" class="btn btn-success"
-                                title="시가총액 상위 등 사전 정의된 인기 종목 20개를 한 번에 등록합니다.">인기 종목 20개 등록</button>
-                    </form>
-                    <form th:action="@{/stocks/sync}" method="post" class="inline-form">
-                        <button type="submit" class="btn btn-primary"
-                                title="KRX 상장종목 목록을 내려받아 신규 상장/폐지 종목을 반영하고 종목 마스터를 최신화합니다.">KRX 동기화</button>
-                    </form>
                 </div>
 
                 <section>
                     <div th:if="${#lists.isEmpty(stocks)}" class="empty-state">
-                        등록된 종목이 없습니다. KRX 동기화 또는 수동 등록을 이용해주세요.
+                        등록된 종목이 없습니다. 수동 등록을 이용해주세요.
                     </div>
                     <table th:unless="${#lists.isEmpty(stocks)}">
                         <thead>

@@ -46,9 +46,9 @@ public class DashboardController {
     private final PortfolioService portfolioService;
     private final AutoTradingWorker autoTradingWorker;
     private final IntradayMonitorWorker intradayMonitorWorker;
-    private final BrokerPort koreaInvestmentApiClient;
+    private final BrokerPort brokerPort;
     private final MarketDataPort marketDataPort;
-    private final FinancialsPort dartDataSyncService;
+    private final FinancialsPort financialsPort;
     private final ApiConfig apiConfig;
     private final MonitorCheckLogRepository monitorCheckLogRepository;
     private final AnalysisScoreRepository analysisScoreRepository;
@@ -77,9 +77,9 @@ public class DashboardController {
             PortfolioService portfolioService,
             @Autowired(required = false) AutoTradingWorker autoTradingWorker,
             @Autowired(required = false) IntradayMonitorWorker intradayMonitorWorker,
-            BrokerPort koreaInvestmentApiClient,
+            BrokerPort brokerPort,
             MarketDataPort marketDataPort,
-            FinancialsPort dartDataSyncService,
+            FinancialsPort financialsPort,
             ApiConfig apiConfig,
             MonitorCheckLogRepository monitorCheckLogRepository,
             AnalysisScoreRepository analysisScoreRepository,
@@ -90,9 +90,9 @@ public class DashboardController {
         this.portfolioService = portfolioService;
         this.autoTradingWorker = autoTradingWorker;
         this.intradayMonitorWorker = intradayMonitorWorker;
-        this.koreaInvestmentApiClient = koreaInvestmentApiClient;
+        this.brokerPort = brokerPort;
         this.marketDataPort = marketDataPort;
-        this.dartDataSyncService = dartDataSyncService;
+        this.financialsPort = financialsPort;
         this.apiConfig = apiConfig;
         this.monitorCheckLogRepository = monitorCheckLogRepository;
         this.analysisScoreRepository = analysisScoreRepository;
@@ -210,7 +210,7 @@ public class DashboardController {
         }
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
-                BrokerBalance res = koreaInvestmentApiClient.getBalance();
+                BrokerBalance res = brokerPort.getBalance();
                 if (res != null && res.success()) {
                     cachedBalance = res;
                     cachedBalanceAt = System.currentTimeMillis();
@@ -266,9 +266,9 @@ public class DashboardController {
         redirectAttributes.addFlashAttribute("tradeResult", "재무제표 동기화 시작 (백그라운드에서 실행 중)");
         new Thread(() -> {
             try {
-                dartDataSyncService.syncAllActiveStocks("2025", "3");
-                dartDataSyncService.syncAllActiveStocks("2024", "3");
-                dartDataSyncService.syncAllActiveStocks("2024", "4");
+                financialsPort.syncAllActiveStocks("2025", "3");
+                financialsPort.syncAllActiveStocks("2024", "3");
+                financialsPort.syncAllActiveStocks("2024", "4");
             } catch (Exception e) {
                 log.error("재무제표 동기화 실패: {}", e.getMessage());
             }
@@ -279,7 +279,7 @@ public class DashboardController {
     @PostMapping("/sync/import-financials")
     public String importFinancials(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         try {
-            int count = dartDataSyncService.importFromJsonFile("/app/dart_financials.json");
+            int count = financialsPort.importFromJsonFile("/app/dart_financials.json");
             redirectAttributes.addFlashAttribute("tradeResult", "재무제표 임포트 완료: " + count + "건 저장");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("tradeResult", "재무제표 임포트 실패: " + e.getMessage());

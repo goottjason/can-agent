@@ -20,12 +20,12 @@ public class PortfolioScheduler {
     private static final Logger log = LoggerFactory.getLogger(PortfolioScheduler.class);
 
     private final PortfolioRepository portfolioRepository;
-    private final BrokerPort koreaInvestmentApiClient;
+    private final BrokerPort brokerPort;
 
     public PortfolioScheduler(PortfolioRepository portfolioRepository,
-                              BrokerPort koreaInvestmentApiClient) {
+                              BrokerPort brokerPort) {
         this.portfolioRepository = portfolioRepository;
-        this.koreaInvestmentApiClient = koreaInvestmentApiClient;
+        this.brokerPort = brokerPort;
     }
 
     // 장중 현재가 갱신: ET 정규장 시간대 5분마다(09:00~09:29 틱은 실질 무해 — 종가/현재가 표시 갱신용).
@@ -40,7 +40,7 @@ public class PortfolioScheduler {
         for (Portfolio portfolio : activePortfolios) {
             try {
                 // P6: 포트가 broker-중립 BigDecimal 현재가를 직접 반환(실패/0은 skip). USD 센트 무손실.
-                BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(portfolio.getStock().getCode());
+                BigDecimal currentPrice = brokerPort.getCurrentPrice(portfolio.getStock().getCode());
                 if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
                     portfolio.updateCurrentPrice(currentPrice);
                     portfolioRepository.save(portfolio);
@@ -69,7 +69,7 @@ public class PortfolioScheduler {
         for (Portfolio portfolio : activePortfolios) {
             try {
                 // P6: 포트가 broker-중립 BigDecimal 종가를 직접 반환(실패/0은 skip). USD 센트 무손실.
-                BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(portfolio.getStock().getCode());
+                BigDecimal currentPrice = brokerPort.getCurrentPrice(portfolio.getStock().getCode());
                 if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
                     portfolio.updateCurrentPrice(currentPrice);
                     portfolioRepository.save(portfolio);

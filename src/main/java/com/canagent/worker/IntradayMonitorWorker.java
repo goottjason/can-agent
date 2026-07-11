@@ -46,7 +46,7 @@ public class IntradayMonitorWorker {
     private final StockPriceRepository stockPriceRepository;
     private final PortfolioRepository portfolioRepository;
     private final AnalysisScoreRepository analysisScoreRepository;
-    private final BrokerPort koreaInvestmentApiClient;
+    private final BrokerPort brokerPort;
     private final CanSlimAnalysisService canSlimAnalysisService;
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
     private final TradingStrategyService tradingStrategyService;
@@ -75,7 +75,7 @@ public class IntradayMonitorWorker {
             StockPriceRepository stockPriceRepository,
             PortfolioRepository portfolioRepository,
             AnalysisScoreRepository analysisScoreRepository,
-            BrokerPort koreaInvestmentApiClient,
+            BrokerPort brokerPort,
             CanSlimAnalysisService canSlimAnalysisService,
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
             TradingStrategyService tradingStrategyService,
@@ -87,7 +87,7 @@ public class IntradayMonitorWorker {
         this.stockPriceRepository = stockPriceRepository;
         this.portfolioRepository = portfolioRepository;
         this.analysisScoreRepository = analysisScoreRepository;
-        this.koreaInvestmentApiClient = koreaInvestmentApiClient;
+        this.brokerPort = brokerPort;
         this.canSlimAnalysisService = canSlimAnalysisService;
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
         this.tradingStrategyService = tradingStrategyService;
@@ -206,7 +206,7 @@ public class IntradayMonitorWorker {
             try {
                 Stock stock = portfolio.getStock();
                 // P6: 포트가 broker-중립 BigDecimal 현재가 반환(실패/0은 skip). USD 센트 무손실.
-                BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
+                BigDecimal currentPrice = brokerPort.getCurrentPrice(stock.getCode());
                 if (currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
@@ -296,7 +296,7 @@ public class IntradayMonitorWorker {
 
     private void processStockForSignal(Stock stock, List<SignalStock> signalStocks, CheckFunnel funnel) {
         // P6: 포트가 broker-중립 BigDecimal 현재가 반환(실패/0은 priceFail 카운트). USD 센트 무손실.
-        BigDecimal currentPrice = koreaInvestmentApiClient.getCurrentPrice(stock.getCode());
+        BigDecimal currentPrice = brokerPort.getCurrentPrice(stock.getCode());
         if (currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
             funnel.priceFail++;
             return;
@@ -571,7 +571,7 @@ public class IntradayMonitorWorker {
 
     private BrokerBalance getBalance() {
         try {
-            BrokerBalance balance = koreaInvestmentApiClient.getBalance();
+            BrokerBalance balance = brokerPort.getBalance();
             if (balance != null && balance.success()) {
                 return balance;
             }

@@ -20,11 +20,10 @@ import java.util.Optional;
 /**
  * SEC EDGAR 기반 {@link FinancialsPort} 구현 — <b>유일한 FinancialsPort 빈</b>.
  *
- * <p>P4에서 {@code DartDataSyncService}의 {@code implements FinancialsPort}가 제거되어,
- * DashboardController·DataSyncScheduler의 FinancialsPort 주입은 자동으로 이 어댑터를 사용한다(시그니처 불변).
+ * <p>DashboardController·DataSyncScheduler의 FinancialsPort 주입은 이 어댑터를 사용한다(시그니처 불변).
+ * (구)DART 동기화 클래스는 P9에서 삭제됨.
  *
  * <p>companyfacts JSON → {@link EdgarCompanyFactsParser} → FinancialStatement upsert.
- * 영속화/중복체크 패턴은 기존 DartDataSyncService의 것을 그대로 이식했다.
  */
 @Service
 public class EdgarFinancialsAdapter implements FinancialsPort {

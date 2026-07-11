@@ -2,7 +2,6 @@ package com.canagent.service;
 
 import com.canagent.domain.stock.Stock;
 import com.canagent.repository.StockRepository;
-import com.canagent.service.dto.KrxCorpDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +10,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,8 +24,6 @@ class StockServiceTest {
 
     @Mock
     private StockRepository stockRepository;
-    @Mock
-    private KrxApiClient krxApiClient;
 
     @InjectMocks
     private StockService stockService;
@@ -102,43 +98,6 @@ class StockServiceTest {
         assertThatThrownBy(() -> stockService.registerStock("005930", "삼성전자", "KOSPI", "반도체"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("이미 등록된 종목");
-    }
-
-    @Test
-    @DisplayName("KRX에서 종목 등록 - 신규")
-    void registerStockFromKrx_new() {
-        KrxCorpDTO krxCorp = new KrxCorpDTO();
-        krxCorp.setStockCode("000660");
-        krxCorp.setItemName("SK하이닉스");
-        krxCorp.setMarketCategory("KOSPI");
-
-        when(stockRepository.findByCode("000660")).thenReturn(Optional.empty());
-        when(stockRepository.save(any(Stock.class))).thenReturn(new Stock("000660", "SK하이닉스", "KOSPI", "KOSPI"));
-
-        Stock result = stockService.registerStockFromKrx(krxCorp);
-
-        assertThat(result.getCode()).isEqualTo("000660");
-        verify(stockRepository).save(any(Stock.class));
-    }
-
-    @Test
-    @DisplayName("KRX에서 종목 등록 - 기존 종목 재활성화")
-    void registerStockFromKrx_existing() {
-        KrxCorpDTO krxCorp = new KrxCorpDTO();
-        krxCorp.setStockCode("005930");
-        krxCorp.setItemName("삼성전자");
-        krxCorp.setMarketCategory("KOSPI");
-
-        Stock inactiveStock = new Stock("005930", "삼성전자", "KOSPI", "반도체");
-        inactiveStock.deactivate();
-
-        when(stockRepository.findByCode("005930")).thenReturn(Optional.of(inactiveStock));
-        when(stockRepository.findById(any())).thenReturn(Optional.of(inactiveStock));
-        when(stockRepository.save(any(Stock.class))).thenReturn(inactiveStock);
-
-        Stock result = stockService.registerStockFromKrx(krxCorp);
-
-        assertThat(result.getCode()).isEqualTo("005930");
     }
 
     @Test

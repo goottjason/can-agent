@@ -34,7 +34,7 @@ public class TradingStrategyService {
     private final CupAndHandleAnalyzer cupAndHandleAnalyzer;
     private final PortfolioRepository portfolioRepository;
     private final TradeRepository tradeRepository;
-    private final BrokerPort koreaInvestmentApiClient;
+    private final BrokerPort brokerPort;
     private final ApiConfig apiConfig;
 
     @Value("${trading.max-positions:10}")
@@ -62,13 +62,13 @@ public class TradingStrategyService {
             CupAndHandleAnalyzer cupAndHandleAnalyzer,
             PortfolioRepository portfolioRepository,
             TradeRepository tradeRepository,
-            BrokerPort koreaInvestmentApiClient,
+            BrokerPort brokerPort,
             ApiConfig apiConfig) {
         this.canSlimAnalysisService = canSlimAnalysisService;
         this.cupAndHandleAnalyzer = cupAndHandleAnalyzer;
         this.portfolioRepository = portfolioRepository;
         this.tradeRepository = tradeRepository;
-        this.koreaInvestmentApiClient = koreaInvestmentApiClient;
+        this.brokerPort = brokerPort;
         this.apiConfig = apiConfig;
     }
 
@@ -91,7 +91,7 @@ public class TradingStrategyService {
             return TradingDecision.hold("최대 보유 종목 수 도달");
         }
 
-        BrokerBalance balance = koreaInvestmentApiClient.getBalance();
+        BrokerBalance balance = brokerPort.getBalance();
         if (!balance.success()) {
             log.warn("잔고 조회 실패: {}", balance.message());
             return TradingDecision.hold("잔고 조회 실패");
@@ -189,7 +189,7 @@ public class TradingStrategyService {
             }
             // P6(§3): notional 매수 — 주문 금액 = 수량 × 가격. 소수 시장가 자동 라우팅(어댑터).
             BigDecimal orderAmount = quantity.multiply(price);
-            OrderResult response = koreaInvestmentApiClient.placeBuy(
+            OrderResult response = brokerPort.placeBuy(
                     stock.getCode(), OrderSpec.notional(orderAmount));
             if (!response.success()) {
                 log.error("매수 주문 실패: {}", response.message());
@@ -228,7 +228,7 @@ public class TradingStrategyService {
             }
             // P6(§3): 소수 수량 매도(전량/부분 청산). 지정가(Limit) — 가격 무손실 BigDecimal.
             // KIS는 정수 절삭·KRW 정수호가로 내부 변환, 토스는 소수 수량 그대로.
-            OrderResult response = koreaInvestmentApiClient.placeSell(
+            OrderResult response = brokerPort.placeSell(
                     stock.getCode(), OrderSpec.limit(quantity, price));
             if (!response.success()) {
                 log.error("매도 주문 실패: {}", response.message());

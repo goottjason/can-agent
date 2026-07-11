@@ -7,7 +7,7 @@ import java.time.LocalDate;
  *
  * <p>P1(미국 대전환): 어댑터 이음새 확보를 위한 순수 인터페이스 추출.
  * P5에서 <b>유일 구현이 {@code TossMarketDataAdapter}</b>로 확정됐다(토스 캔들 페이지네이션 백필).
- * {@code KrxDataSyncService}는 {@code implements}가 제거돼 더는 이 포트가 아니다(P9 삭제 예정).
+ * (P9: 폐기된 KRX 동기화 클래스는 삭제됨.)
  *
  * <p>fetch 루프는 KRX의 "날짜별 전종목 배치"에서 토스의 "종목별 캔들 페이지네이션"으로 역전됐다.
  *

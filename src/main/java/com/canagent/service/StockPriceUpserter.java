@@ -14,14 +14,11 @@ import java.util.Optional;
 /**
  * StockPrice 생성·중복체크·저장 공유 헬퍼.
  *
- * <p>P5: {@code KrxDataSyncService.savePriceImmediately}가 쓰던 영속화 패턴(같은 (stock,date) 존재 시 skip,
- * 없으면 저장)을 소스별로 재사용 가능하게 추출했다. {@code TossMarketDataAdapter}가 종목별 캔들 upsert에 쓴다.
+ * <p>P5에서 (구)KRX 일별 동기화가 쓰던 영속화 패턴(같은 (stock,date) 존재 시 skip, 없으면 저장)을
+ * 소스별로 재사용 가능하게 추출했다. {@code TossMarketDataAdapter}가 종목별 캔들 upsert에 쓴다.
+ * (P9: KRX 동기화 클래스는 삭제됨 — 이 헬퍼가 유일한 upsert 경로.)
  *
- * <p>KrxDataSyncService는 자체 단위테스트({@code @InjectMocks}로 StockPriceRepository 직접 모킹)를
- * 무수정 유지해야 하므로 이 헬퍼로 리팩터하지 않고 내부 인라인 로직을 그대로 둔다(P9 정리 대상).
- *
- * <p>{@code REQUIRES_NEW}로 캔들 1건 단위 커밋 — 한 건 실패가 종목 전체 백필을 롤백시키지 않게 한다
- * (KRX 벌크 동기화의 검증된 패턴).
+ * <p>{@code REQUIRES_NEW}로 캔들 1건 단위 커밋 — 한 건 실패가 종목 전체 백필을 롤백시키지 않게 한다.
  */
 @Component
 public class StockPriceUpserter {

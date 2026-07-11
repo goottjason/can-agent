@@ -19,10 +19,9 @@ public class DataSyncScheduler {
     private static final Logger log = LoggerFactory.getLogger(DataSyncScheduler.class);
     private static final ZoneId ET = ZoneId.of("America/New_York");
 
-    // P5: price 동기화 의존을 구체 KrxDataSyncService → MarketDataPort로 전환(P1 디커플 완성).
-    // 유일 구현은 TossMarketDataAdapter. 구현·모킹 교체가 가능해진다.
+    // 주가 동기화는 MarketDataPort 경유(유일 구현 TossMarketDataAdapter). 구현·모킹 교체 가능.
     private final MarketDataPort marketDataPort;
-    // P4: 재무 의존을 구체 DartDataSyncService → FinancialsPort로 전환. 유일 구현은 EdgarFinancialsAdapter.
+    // 재무 동기화는 FinancialsPort 경유(유일 구현 EdgarFinancialsAdapter).
     private final FinancialsPort financialsPort;
 
     public DataSyncScheduler(MarketDataPort marketDataPort,
