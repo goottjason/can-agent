@@ -1,6 +1,5 @@
 package com.canagent.web;
 
-import com.canagent.config.ApiConfig;
 import com.canagent.domain.analysis.AnalysisScore;
 import com.canagent.domain.analysis.MonitorCheckLog;
 import com.canagent.domain.portfolio.Portfolio;
@@ -49,7 +48,6 @@ public class DashboardController {
     private final BrokerPort brokerPort;
     private final MarketDataPort marketDataPort;
     private final FinancialsPort financialsPort;
-    private final ApiConfig apiConfig;
     private final MonitorCheckLogRepository monitorCheckLogRepository;
     private final AnalysisScoreRepository analysisScoreRepository;
     private final ObjectMapper objectMapper;
@@ -80,7 +78,6 @@ public class DashboardController {
             BrokerPort brokerPort,
             MarketDataPort marketDataPort,
             FinancialsPort financialsPort,
-            ApiConfig apiConfig,
             MonitorCheckLogRepository monitorCheckLogRepository,
             AnalysisScoreRepository analysisScoreRepository,
             ObjectMapper objectMapper,
@@ -93,7 +90,6 @@ public class DashboardController {
         this.brokerPort = brokerPort;
         this.marketDataPort = marketDataPort;
         this.financialsPort = financialsPort;
-        this.apiConfig = apiConfig;
         this.monitorCheckLogRepository = monitorCheckLogRepository;
         this.analysisScoreRepository = analysisScoreRepository;
         this.objectMapper = objectMapper;
@@ -114,7 +110,9 @@ public class DashboardController {
         Map<String, Object> riskStatus = portfolioService.getRiskStatus();
 
         // 브로커 계좌 잔고 조회
-        String accountNumber = apiConfig.getKoreaInvestment().getAccountNumber();
+        // 계좌번호는 broker-중립: apiConfig(KIS 설정) 의존을 제거하고 BrokerBalance.accountNumber()에서 가져온다.
+        // (토스=accountNo, KIS=계좌번호). 조회 실패·미조회 시 "미설정".
+        String accountNumber = null;
         BigDecimal totalAssetAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal availableCashAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         boolean accountConnected = false;
@@ -126,6 +124,7 @@ public class DashboardController {
         if (balance != null && balance.success()) {
             totalAssetAmount = toMoney(balance.totalEval());
             availableCashAmount = toMoney(balance.availableCash());
+            accountNumber = balance.accountNumber();
             accountConnected = true;
         }
 

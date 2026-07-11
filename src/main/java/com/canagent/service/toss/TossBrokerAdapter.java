@@ -123,6 +123,7 @@ public class TossBrokerAdapter implements BrokerPort {
     // === PoC 확정(2026-07-11, §2): 계좌 헤더·accounts 응답 필드 ===
     private static final String HEADER_ACCOUNT = "X-Tossinvest-Account";
     private static final String FIELD_ACCOUNT_SEQ = "accountSeq";
+    private static final String FIELD_ACCOUNT_NO = "accountNo"; // 표시용 실계좌번호(§2)
 
     private final RestTemplate restTemplate;
     private final TossProperties props;
@@ -131,6 +132,9 @@ public class TossBrokerAdapter implements BrokerPort {
 
     /** accountSeq 캐시(계좌콜 헤더). env override 우선, 없으면 /accounts에서 1회 조회 후 캐시. */
     private volatile String cachedAccountSeq;
+
+    /** accountNo 캐시(표시용 실계좌번호). /accounts result[0].accountNo를 accountSeq와 함께 조회·캐시. */
+    private volatile String cachedAccountNo;
 
     public TossBrokerAdapter(RestTemplate restTemplate, TossProperties props, TossTokenProvider tokenProvider) {
         this.restTemplate = restTemplate;
@@ -271,32 +275,40 @@ public class TossBrokerAdapter implements BrokerPort {
             return BrokerBalance.failure(e.getMessage());
         }
 
-        BigDecimal totalEval = BigDecimal.ZERO;
+        // 표시용 실계좌번호(accountNo). accounts 조회 실패 시 null(조용실패 아님 — 헤더 조회 경로에서 로그).
+        String accountNo = resolveAccountNo(token);
+
+        // === 총자산 계약(현금+주식) ===: totalEval = cashBuyingPower + Σ item.marketValue.amount.usd.
+        // 종전엔 holdings.marketValue(주식만)로 채워 현금 미포함 → 보유 0이면 총자산 0(대시보드 $0 버그).
+        // 이제 현금을 기반으로 두고 보유 평가액을 더한다(usd null 항목은 0 취급, 방어).
+        BigDecimal holdingsEval = BigDecimal.ZERO;
         List<BrokerBalance.Holding> holdings = new ArrayList<>();
         try {
             JsonNode h = fetchHoldings(token);
-            totalEval = usdAmount(h.path(FIELD_MARKET_VALUE));
             JsonNode items = h.path(FIELD_ITEMS);
             if (items.isArray()) {
                 for (Iterator<JsonNode> it = items.elements(); it.hasNext(); ) {
                     JsonNode item = it.next();
+                    BigDecimal itemEval = usdAmount(item.path(FIELD_MARKET_VALUE));
+                    holdingsEval = holdingsEval.add(itemEval);
                     holdings.add(new BrokerBalance.Holding(
                             text(item, FIELD_H_SYMBOL),
                             text(item, FIELD_H_NAME),
                             decimalOrZero(item, FIELD_H_QTY),
                             decimalOrZero(item, FIELD_H_AVG_PRICE),
-                            usdAmount(item.path(FIELD_MARKET_VALUE))));
+                            itemEval));
                 }
             }
         } catch (HttpClientErrorException e) {
             handle4xx(e, "holdings");
-            // 현금은 조회됐으나 보유 조회 실패 — 사유를 담아 부분 성공 반환(조용실패 방지).
-            return new BrokerBalance(true, cash, BigDecimal.ZERO, List.of(), "holdings 4xx " + e.getStatusCode());
+            // 현금은 조회됐으나 보유 조회 실패 — 총자산=현금(주식 미상), 사유 담아 부분 성공(조용실패 방지).
+            return new BrokerBalance(true, cash, cash, List.of(), accountNo, "holdings 4xx " + e.getStatusCode());
         } catch (Exception e) {
             log.warn("토스 holdings 실패: {}", e.getMessage());
-            return new BrokerBalance(true, cash, BigDecimal.ZERO, List.of(), "holdings 실패: " + e.getMessage());
+            return new BrokerBalance(true, cash, cash, List.of(), accountNo, "holdings 실패: " + e.getMessage());
         }
-        return new BrokerBalance(true, cash, totalEval, holdings, null);
+        BigDecimal totalEval = cash.add(holdingsEval);
+        return new BrokerBalance(true, cash, totalEval, holdings, accountNo, null);
     }
 
     @Override
@@ -471,9 +483,30 @@ public class TossBrokerAdapter implements BrokerPort {
         if (cached != null) {
             return cached;
         }
+        fetchAndCacheAccounts(token);
+        return cachedAccountSeq;
+    }
+
+    /**
+     * 표시용 실계좌번호(accountNo). === PoC 확정(2026-07-11, §2) ===:
+     * {@code /accounts} result[0].accountNo를 accountSeq와 함께 1회 조회·캐시(대시보드 계좌번호 broker-중립화).
+     * env override(TOSS_ACCOUNT)는 accountSeq(헤더)용이며 accountNo와 무관하므로 항상 accounts에서 확보한다.
+     * 조회 실패 시 null(대시보드 "미설정" 표시 — 조용실패 아님, accounts 실패는 로그로 남는다).
+     */
+    private String resolveAccountNo(String token) {
+        String cached = cachedAccountNo;
+        if (cached != null) {
+            return cached;
+        }
+        fetchAndCacheAccounts(token);
+        return cachedAccountNo;
+    }
+
+    /** {@code /accounts} result[0]에서 accountSeq(헤더)·accountNo(표시)를 함께 조회·캐시한다. */
+    private void fetchAndCacheAccounts(String token) {
         synchronized (this) {
-            if (cachedAccountSeq != null) {
-                return cachedAccountSeq;
+            if (cachedAccountSeq != null && cachedAccountNo != null) {
+                return;
             }
             try {
                 String url = props.getBaseUrl() + ACCOUNTS_PATH;
@@ -483,19 +516,23 @@ public class TossBrokerAdapter implements BrokerPort {
                 if (bodyStr != null && !bodyStr.isBlank()) {
                     JsonNode result = objectMapper.readTree(bodyStr).path(FIELD_RESULT);
                     if (result.isArray() && result.size() > 0) {
-                        String seq = text(result.get(0), FIELD_ACCOUNT_SEQ);
-                        if (seq != null) {
+                        JsonNode first = result.get(0);
+                        String seq = text(first, FIELD_ACCOUNT_SEQ);
+                        String no = text(first, FIELD_ACCOUNT_NO);
+                        if (seq != null && cachedAccountSeq == null) {
                             cachedAccountSeq = seq;
-                            log.info("토스 accountSeq 조회·캐시: {}", seq);
-                            return seq;
                         }
+                        if (no != null && cachedAccountNo == null) {
+                            cachedAccountNo = no;
+                        }
+                        log.info("토스 accounts 조회·캐시: accountSeq={} accountNo={}", seq, no);
+                        return;
                     }
                 }
-                log.warn("토스 accounts: accountSeq 없음");
+                log.warn("토스 accounts: 계좌 정보 없음");
             } catch (Exception e) {
                 log.warn("토스 accounts 조회 실패: {}", e.getMessage());
             }
-            return null;
         }
     }
 

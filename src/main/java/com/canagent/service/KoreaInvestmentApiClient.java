@@ -195,7 +195,8 @@ public class KoreaInvestmentApiClient implements BrokerPort {
                         parseBd(item.getEvaluationAmount())));
             }
         }
-        return new BrokerBalance(true, availableCash, totalEval, holdings, null);
+        return new BrokerBalance(true, availableCash, totalEval, holdings,
+                apiConfig.getKoreaInvestment().getAccountNumber(), null);
     }
 
     private static BigDecimal parseBd(String v) {

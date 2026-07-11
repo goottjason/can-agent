@@ -213,7 +213,7 @@ class TossBrokerAdapterTest {
     // ========== 잔고(buying-power + holdings) ==========
 
     @Test
-    @DisplayName("잔고(§3·§4): buying-power.cashBuyingPower + holdings.marketValue.amount.usd·items 매핑")
+    @DisplayName("잔고(§3·§4): totalEval=현금+Σholdings.usd, cashBuyingPower·items·accountNo 매핑")
     void getBalance_mapsBuyingPowerAndHoldings() throws Exception {
         when(tokenProvider.getAccessToken()).thenReturn("TOK");
         // buying-power → holdings 순서: URL로 응답 라우팅
@@ -221,12 +221,17 @@ class TossBrokerAdapterTest {
                 .thenReturn(ResponseEntity.ok(fixture("buying-power.json")));
         when(restTemplate.exchange(contains("/api/v1/holdings"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(fixture("holdings.json")));
+        // 표시용 accountNo(§2): /accounts result[0].accountNo=10701020640
+        when(restTemplate.exchange(contains("/api/v1/accounts"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(fixture("accounts.json")));
 
         BrokerBalance balance = adapter().getBalance();
 
         assertThat(balance.success()).isTrue();
         assertThat(balance.availableCash()).isEqualByComparingTo(new BigDecimal("1234.56")); // cashBuyingPower(USD)
-        assertThat(balance.totalEval()).isEqualByComparingTo(new BigDecimal("5678.90"));      // marketValue.amount.usd
+        // 총자산 계약(현금+주식): 1234.56 + (380.00 + 410.00) = 2024.56. 보유 marketValue만(5678.90) 아님.
+        assertThat(balance.totalEval()).isEqualByComparingTo(new BigDecimal("2024.56"));
+        assertThat(balance.accountNumber()).isEqualTo("10701020640"); // /accounts result[0].accountNo
         assertThat(balance.holdings()).hasSize(2);
         assertThat(balance.holdings().get(0).symbol()).isEqualTo("AAPL");
         assertThat(balance.holdings().get(0).quantity()).isEqualByComparingTo(new BigDecimal("2.5"));
@@ -242,13 +247,15 @@ class TossBrokerAdapterTest {
                 .thenReturn(ResponseEntity.ok(fixture("buying-power.json")));
         when(restTemplate.exchange(contains("/api/v1/holdings"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(fixture("holdings.json")));
+        when(restTemplate.exchange(contains("/api/v1/accounts"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(fixture("accounts.json")));
 
         adapter().getBalance();
 
         ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<HttpEntity> entity = ArgumentCaptor.forClass(HttpEntity.class);
-        // 두 GET(buying-power+holdings)을 모두 캡처한 뒤 buying-power 호출을 골라 검증.
-        verify(restTemplate, times(2)).exchange(url.capture(), eq(HttpMethod.GET), entity.capture(), eq(String.class));
+        // 세 GET(buying-power+holdings+accounts)을 모두 캡처한 뒤 buying-power 호출을 골라 검증.
+        verify(restTemplate, times(3)).exchange(url.capture(), eq(HttpMethod.GET), entity.capture(), eq(String.class));
         assertThat(url.getAllValues()).anyMatch(u -> u.contains("/api/v1/buying-power") && u.contains("currency=USD"));
         int idx = url.getAllValues().indexOf(url.getAllValues().stream()
                 .filter(u -> u.contains("/api/v1/buying-power")).findFirst().orElseThrow());
@@ -263,6 +270,8 @@ class TossBrokerAdapterTest {
                 .thenReturn(ResponseEntity.ok(fixture("buying-power.json")));
         when(restTemplate.exchange(contains("/api/v1/holdings"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(fixture("holdings.json")));
+        when(restTemplate.exchange(contains("/api/v1/accounts"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(fixture("accounts.json")));
 
         adapter().getBalance();
 

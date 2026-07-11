@@ -15,7 +15,7 @@ public class MockDataFactory {
     // 잔고 조회 성공 응답(주문 가능 현금 지정) — 실외부 API 호출을 격리하기 위한 broker-중립 테스트 스텁.
     public static BrokerBalance createBalanceResponse(String availableCash) {
         BigDecimal cash = new BigDecimal(availableCash);
-        return new BrokerBalance(true, cash, cash, List.of(), null);
+        return new BrokerBalance(true, cash, cash, List.of(), "TEST-ACCT", null);
     }
 
     public static Stock createStock(String code, String name, String market, String sector) {

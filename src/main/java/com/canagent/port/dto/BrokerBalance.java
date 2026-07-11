@@ -16,6 +16,7 @@ import java.util.List;
  * @param availableCash 주문 가능 현금(KIS 출금가능금액 / 토스 USD 현금). 실패 시 0.
  * @param totalEval     총 평가금액(현금+주식). 표시용.
  * @param holdings      보유 종목 목록(표시·매도 판단 보조).
+ * @param accountNumber 브로커 실계좌번호(KIS 계좌 / 토스 accountNo). 표시용, 미조회 시 null.
  * @param message       실패/경고 사유(성공 시 null 가능).
  */
 public record BrokerBalance(
@@ -23,6 +24,7 @@ public record BrokerBalance(
         BigDecimal availableCash,
         BigDecimal totalEval,
         List<Holding> holdings,
+        String accountNumber,
         String message
 ) {
 
@@ -35,8 +37,8 @@ public record BrokerBalance(
             BigDecimal evalAmount
     ) {}
 
-    /** 조회 실패. availableCash=0, 사유를 담는다. */
+    /** 조회 실패. availableCash=0, 계좌번호 null, 사유를 담는다. */
     public static BrokerBalance failure(String message) {
-        return new BrokerBalance(false, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), message);
+        return new BrokerBalance(false, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), null, message);
     }
 }
