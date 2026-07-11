@@ -46,11 +46,11 @@ CI/CD 인프라 선구축(자동배포 비활성). 로컬 커밋 미푸시. 실�
 - [ ] **#8 CI/CD 자동배포 활성화** ⛔(← #1)
   - GitHub secret CANAGENT_DEPLOY_KEY 등록, deploy.yml push 트리거 해제
 
-- [ ] **#9 실서버 배포 + 검증** ⛔(← #2·#3·#4·#7, 중대·승인 필수)
+- [~] **#9 실서버 배포 + 검증** 🔄 관측모드 배포 완료(prod, broker=true·REAL_TRADING=false, 유니버스100·시세100·재무99, 캔들언랩 검증). 실매매 활성은 월요일 PoC 후
   - prod toss.broker.enabled=true, 마이그레이션 적용, 유니버스·재무·시세 적재
   - 배포→헬스체크→모니터링→소액 실매매 관측, 롤백(KIS 폴백/이전 커밋) 준비
 
-- [ ] **#10 로컬 커밋 origin/main 푸시** (자동배포 없음 — GitHub 반영만)
+- [x] **#10 로컬 커밋 origin/main 푸시** ✅ d3500e0 push(55cfe3e→d3500e0) (자동배포 없음 — GitHub 반영만)
   - 2ef43e9(PoC스크립트)·d2bad43(P6b)·18f9d32(CI/CD)·f224e12(실주문PoC) 등
 
 ---
