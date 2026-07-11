@@ -16,15 +16,15 @@ CI/CD 인프라 선구축(자동배포 비활성). 로컬 커밋 미푸시. 실�
   - ✅ compose can-agent 서비스, build:./can-agent (멀티스테이지와 호환)
   - ⚠️ **선결과제(아래 "Task #1 발견")**: 서버 미커밋 변경·compose TOSS env 누락
 
-- [ ] **#2 DB 마이그레이션 SQL 준비 (P3 스키마)**
+- [x] **#2 DB 마이그레이션 SQL 준비 (P3 스키마)** ✅ scripts/db/us-pivot-migration.sql (eps 19,4·debt_ratio 12,2·fiscal_quarter nullable). 적용은 배포시.
   - eps scale 2→4, debt_ratio precision 상향, periodType(QUARTER/ANNUAL)·fiscalQuarter nullable
   - 프로덕션 적용용 ALTER 스크립트(적용은 배포 게이트)
 
-- [ ] **#3 미국 유니버스 적재 + 규모 결정**
+- [x] **#3 미국 유니버스 적재 + 규모 결정** ✅ company_tickers.json 100종목(NYSE64·NASDAQ36), POST /stocks/load-universe+버튼, GOOG/GOOGL 가드
   - company_tickers.json → Stock DB(SecTickerUniverseLoader), edgar.user-agent 필요
   - rate limit 고려 상위 N부터, exchange/cik 채워지는지 확인
 
-- [ ] **#4 prod 설정 정리 (application-prod.yml + 서버 .env)**
+- [x] **#4 prod 설정 정리** ✅ 서버 compose environment+.env에 TOSS_*·EDGAR_USER_AGENT(broker=false), 백업·config검증. repo는 application.yml이 커버
   - toss.*·edgar.user-agent·telegram. broker.enabled는 PoC 후 true
   - 서버 .env에 TOSS_*/TELEGRAM_* 반영
 
