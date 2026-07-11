@@ -41,7 +41,7 @@
                         <tr><th>구분</th><th>기술</th></tr>
                         <tr><td>백엔드</td><td>Spring Boot 3.3, Java 17, Spring Data JPA</td></tr>
                         <tr><td>데이터베이스</td><td>PostgreSQL 16 (Docker)</td></tr>
-                        <tr><td>증권사 API</td><td>한국투자증권 Open API (실전 계좌)</td></tr>
+                        <tr><td>증권사 API</td><td>토스 (실전 계좌)</td></tr>
                         <tr><td>배포</td><td>Docker Compose, Nginx 리버스 프록시</td></tr>
                         <tr><td>알림</td><td>Telegram Bot</td></tr>
                         <tr><td>프론트엔드</td><td>Thymeleaf (서버 사이드 렌더링)</td></tr>
@@ -51,7 +51,7 @@
                     <div class="flow-diagram">
                         <strong>1단계: 데이터 수집</strong><br>
                         <span class="tag tag-blue">매일 04:00 ET</span> SEC 나이틀리 배치 이후 가격·재무 데이터 동기화<br>
-                        <span class="tag tag-green">분기별</span> DART 재무제표 수집 → 금융지표 계산<br><br>
+                        <span class="tag tag-green">분기별</span> SEC EDGAR 재무제표 수집 → 금융지표 계산<br><br>
 
                         <span class="arrow">▼</span><br><br>
 

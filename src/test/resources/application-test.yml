@@ -17,3 +17,10 @@ spring:
 trading:
   scheduler:
     enabled: false
+
+# P8(broker 전환): 테스트는 KIS(KoreaInvestmentApiClient) 단독 BrokerPort 전제로 목킹한다
+# (@MockBean KoreaInvestmentApiClient). toss.broker.enabled를 꺼 TossBrokerAdapter 빈을 미생성 →
+# KIS가 유일 BrokerPort로 주입되어 기존 목킹 시맨틱을 보존한다. 토스 주문 어댑터는 TossBrokerAdapterTest가 단위 검증.
+toss:
+  broker:
+    enabled: false

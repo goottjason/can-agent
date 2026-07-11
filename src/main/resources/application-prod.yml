@@ -27,6 +27,13 @@ server:
   servlet:
     context-path: /can-agent
 
+# P8(broker 전환): 실배포 broker는 토스 키·PoC 상수 확정 및 별도 사용자 승인 후에만 활성한다.
+# 아래를 열면(또는 TOSS_BROKER_ENABLED=true) TossBrokerAdapter가 주문 BrokerPort가 되어 실계좌 주문 경로가 바뀐다.
+# 현재는 미설정 → prod에서도 @Primary 없는 KIS가 단독 BrokerPort로 폴백(종전 동작 유지).
+# toss:
+#   broker:
+#     enabled: true
+
 # 외부 API 설정
 api:
   dart:

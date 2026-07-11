@@ -12,7 +12,6 @@ import com.canagent.service.dto.KoreaInvestmentBalanceResponse;
 import com.canagent.service.dto.KoreaInvestmentPriceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -31,13 +30,13 @@ import java.util.UUID;
  *
  * <p>P6(미국 대전환): 포트 계약이 broker-중립 값타입으로 재설계됨에 따라, KIS DTO를
  * {@link OrderResult}/{@link BrokerBalance}/{@link OrderStatus}로 <b>어댑터 내부에서 매핑</b>한다.
- * REST 조립·KIS DTO 파싱은 종전과 동일(회귀 없음). {@code @Primary}로 현재 국내 운영 기본 빈을 유지하고,
- * 토스({@code TossBrokerAdapter})는 프로퍼티/프로필로 활성한다.
+ * REST 조립·KIS DTO 파싱은 종전과 동일(회귀 없음). P8(broker 전환)에서 {@code @Primary}를 제거해
+ * <b>폴백 빈</b>이 됐다: {@code toss.broker.enabled=true}면 {@code TossBrokerAdapter}(@Primary)가 주입되고,
+ * 꺼지면(예: test 프로필) 이 빈이 단독 BrokerPort로 선택된다.
  *
  * <p>국내 경로는 <b>정수 지정가({@code Limit})만 지원</b>한다. {@code Notional}(금액 시장가)은 미국 소수 매수 전용이라
  * KIS에선 사유를 담아 실패 반환한다(조용실패 금지). 가격 0인 {@code Limit}은 종전과 동일하게 시장가로 처리한다.
  */
-@Primary
 @Service
 public class KoreaInvestmentApiClient implements BrokerPort {
 

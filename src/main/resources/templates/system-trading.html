@@ -44,22 +44,22 @@
                     <p>총 예수금을 종목별 점수에 비례하여 배분합니다. 점수가 높은 종목에 더 많은 자금을 배정합니다.</p>
 
                     <div class="formula">
-                        <strong>종목별 투자금</strong> = 총 예수금 × (종목 점수 ÷ 매수 대상 총점)<br><br>
-                        <strong>매수 수량</strong> = 종목별 투자금 ÷ 현재가 (내림)
+                        <strong>매수 금액</strong> = 총 예수금 × 종목별 배분율(positionRate = 종목 점수 ÷ 매수 대상 총점)<br><br>
+                        <strong>매수 수량</strong> = 배분 금액 ÷ 현재가 → 소수 주식수. 소수점 금액 기반 시장가 매수(orderAmount)라 정수 내림 없음
                     </div>
 
                     <h3>예시</h3>
                     <table>
                         <tr><th>종목</th><th>종합 점수</th><th>투자금 배분</th><th>비율</th></tr>
-                        <tr><td>A종목</td><td>150점</td><td>150,000원</td><td>50%</td></tr>
-                        <tr><td>B종목</td><td>120점</td><td>120,000원</td><td>40%</td></tr>
-                        <tr><td>C종목</td><td>30점</td><td>30,000원</td><td>10%</td></tr>
+                        <tr><td>A종목</td><td>150점</td><td>$150.00</td><td>50%</td></tr>
+                        <tr><td>B종목</td><td>120점</td><td>$120.00</td><td>40%</td></tr>
+                        <tr><td>C종목</td><td>30점</td><td>$30.00</td><td>10%</td></tr>
                         <tr style="background:#f0f7ff;font-weight:600;">
-                            <td>합계</td><td>300점</td><td>300,000원</td><td>100%</td></tr>
+                            <td>합계</td><td>300점</td><td>$300.00</td><td>100%</td></tr>
                     </table>
 
                     <div class="warn">
-                        <strong>최소 주문금액:</strong> 5,000원 미만이면 매수를 건너뜁니다.
+                        <strong>주문 제외 조건:</strong> 현재가가 유효하지 않은(≤0) 종목만 제외하며, 배분 금액이 $1 미만인 극소액은 주문하지 않습니다(먼지 주문 방지). 소수점 금액 기반 매수라 최소 주문 수량 제한은 없습니다.
                     </div>
                 </div>
 
@@ -112,7 +112,7 @@
                         <tr><td>익절 기준</td><td><code>+20%</code></td><td>목표 수익률</td></tr>
                         <tr><td>매수 신호 점수</td><td><code>120점</code></td><td>CANSLIM(100) + C&H(90) 중 120 이상</td></tr>
                         <tr><td>매도 점수 기준</td><td><code>40점</code></td><td>CANSLIM 점수 40 미만 시 매도</td></tr>
-                        <tr><td>최소 주문금액</td><td><code>5,000원</code></td><td>미만 시 매수 건너뜀</td></tr>
+                        <tr><td>먼지 주문 방지</td><td><code>$1</code></td><td>배분 금액이 $1 미만이면 주문하지 않음(현재가 ≤0도 제외)</td></tr>
                         <tr><td>매수 재시도</td><td><code>3회</code></td><td>실패 시 1초 간격 재시도</td></tr>
                     </table>
                 </div>

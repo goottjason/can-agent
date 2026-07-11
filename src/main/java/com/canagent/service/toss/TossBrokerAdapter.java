@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -36,13 +37,16 @@ import java.util.Map;
  *
  * <p>P6(미국 대전환): 토스 주문 라이프사이클(생성/정정/취소/상세)·계좌(assets)·환율을 broker-중립 값타입으로 흡수한다.
  * 인증은 {@link TossTokenProvider}(OAuth Bearer 재사용, 요청 단위 부착 — 공유 RestTemplate 오염 방지, TossCandleClient 선례).
- * KIS({@code @Primary})와 빈 충돌 없이 공존하도록 프로퍼티({@code toss.broker.enabled=true})로만 활성한다.
+ * P8(broker 전환): {@code toss.broker.enabled=true}일 때만 빈이 생성되며, 이때 {@code @Primary}로 KIS를 제치고
+ * 주입되는 BrokerPort가 된다. 프로퍼티가 꺼지면 이 빈은 미생성되어 KIS가 단독 BrokerPort로 폴백한다.
+ * us-pivot 기본(application.yml)은 켜짐이나, test 프로필은 KIS 목킹 유지를 위해 꺼둔다(application-test.yml).
  *
  * <p><b>실 샌드박스 호출 불가(승인 대기)</b>: 모든 요청/응답 필드명은 openapi.json 문서 스펙 기준 <b>가정값</b>이며
  * 명명 상수로 이 파일 한 곳에 집중했다. 실호출 확정 시 상수만 교체한다. 미확정은 {@code === PoC 미확정 ===} 주석 표시.
  * 필드명 오타가 조용한 0건으로 새지 않도록, 실패·부재 시 사유를 담은 실패 결과를 반환하고 테스트가 매핑을 검증한다.
  */
 @Component
+@Primary
 @ConditionalOnProperty(name = "toss.broker.enabled", havingValue = "true")
 public class TossBrokerAdapter implements BrokerPort {
 

@@ -24,8 +24,8 @@
         .badge-active { background: #d4edda; color: #155724; }
         .badge-inactive { background: #f8d7da; color: #721c24; }
         .market-tag { padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
-        .market-kospi { background: #e3f2fd; color: #1565c0; }
-        .market-kosdaq { background: #fff3e0; color: #e65100; }
+        .market-nyse { background: #e3f2fd; color: #1565c0; }
+        .market-nasdaq { background: #fff3e0; color: #e65100; }
         .section-title { font-size: 1.1rem; margin: 20px 0 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
     </style>
 </head>
@@ -42,8 +42,8 @@
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <span class="market-tag"
-                              th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
-                              th:text="${stock.market}">KOSPI</span>
+                              th:classappend="${stock.market == 'NYSE'} ? 'market-nyse' : 'market-nasdaq'"
+                              th:text="${stock.market}">NYSE</span>
                         <span class="badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
                               th:text="${stock.active} ? '활성' : '비활성'">활성</span>
                         <div th:if="${stock.active}">
@@ -66,7 +66,7 @@
                     </div>
                     <div class="info-card">
                         <h4>시장</h4>
-                        <div class="value" th:text="${stock.market}">KOSPI</div>
+                        <div class="value" th:text="${stock.market}">NYSE</div>
                     </div>
                     <div class="info-card">
                         <h4>업종</h4>
@@ -88,7 +88,7 @@
                             </tr>
                             <tr>
                                 <th>시장</th>
-                                <td th:text="${stock.market}">KOSPI</td>
+                                <td th:text="${stock.market}">NYSE</td>
                             </tr>
                             <tr>
                                 <th>업종</th>

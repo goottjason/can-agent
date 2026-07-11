@@ -20,3 +20,4 @@
 | 2026-07-09 | 매수 3문제: 주문 tr_id R→U(EGW00202 해소)·대시보드 잔고 견고화 배포 / 소액계좌 분산 정수매수 사이징(배포 대기) / 국내 소수점 API 불가 리서치 | backend+qa | 실계좌 매수 개시 후 주문실패·계좌표시·사이징 노출 |
 | 2026-07-11 | 미국대전환 P6(us-pivot): 토스 주문 어댑터 + BrokerPort broker-중립 재설계 + notional 사이징 + MarketCalendarPort. QA PASS(208테스트), 미배포(토스 미승인·PoC 상수 대기) | backend+qa | 토스 승인 가정, 주문 경로 실장·픽스처 검증 |
 | 2026-07-11 | 미국대전환 P7(us-pivot): 시간·스케줄 ET 재배선(존 Asia/Seoul→America/New_York, isTradingHours 3중복→MarketHours 공유유틸, 정적 NYSE 휴일폴백, 크론 3원 ET 정합, 템플릿 KST→ET). QA PASS(222테스트) | backend+dashboard+qa | 미국장 개장·크론을 ET로, 휴일 오주문 방지 |
+| 2026-07-11 | 미국대전환 P8(us-pivot): 표시층 USD 통화·벤더(토스/SEC EDGAR)·market enum(NYSE/NASDAQ)·사이징 서사 정합 + **broker 토스 전환**(TossBrokerAdapter @Primary, prod는 꺼둠). QA PASS(224테스트), 미배포 | backend+dashboard+qa | 화면·주문경로를 미국(토스)으로, 실배포는 토스 키·PoC·승인 게이트 |

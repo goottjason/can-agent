@@ -76,7 +76,11 @@
     }
 
     function fmtInt(n) {
-        return (n == null) ? '-' : Number(n).toLocaleString('ko-KR');
+        return (n == null) ? '-' : Number(n).toLocaleString('en-US');
+    }
+
+    function fmtMoney(n) {
+        return (n == null) ? '-' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function fmtTime(isoString) {
@@ -230,7 +234,7 @@
             return '<tr>' +
                 '<td><span class="stock-name">' + esc(s.name) + '</span> ' +
                 '<span class="stock-code">(' + esc(s.code) + ')</span></td>' +
-                '<td>' + fmtInt(s.price) + '원</td>' +
+                '<td>' + fmtMoney(s.price) + '</td>' +
                 '<td>' + fmtInt(s.canSlimScore) + '</td>' +
                 '<td>' + fmtInt(s.cupScore) + '</td>' +
                 '<td style="font-weight:bold;">' + fmtInt(s.totalScore) + '</td>' +

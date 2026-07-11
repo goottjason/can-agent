@@ -47,7 +47,7 @@ public class DashboardController {
     private final AutoTradingWorker autoTradingWorker;
     private final IntradayMonitorWorker intradayMonitorWorker;
     private final BrokerPort koreaInvestmentApiClient;
-    private final MarketDataPort krxDataSyncService;
+    private final MarketDataPort marketDataPort;
     private final FinancialsPort dartDataSyncService;
     private final ApiConfig apiConfig;
     private final MonitorCheckLogRepository monitorCheckLogRepository;
@@ -78,7 +78,7 @@ public class DashboardController {
             @Autowired(required = false) AutoTradingWorker autoTradingWorker,
             @Autowired(required = false) IntradayMonitorWorker intradayMonitorWorker,
             BrokerPort koreaInvestmentApiClient,
-            MarketDataPort krxDataSyncService,
+            MarketDataPort marketDataPort,
             FinancialsPort dartDataSyncService,
             ApiConfig apiConfig,
             MonitorCheckLogRepository monitorCheckLogRepository,
@@ -91,7 +91,7 @@ public class DashboardController {
         this.autoTradingWorker = autoTradingWorker;
         this.intradayMonitorWorker = intradayMonitorWorker;
         this.koreaInvestmentApiClient = koreaInvestmentApiClient;
-        this.krxDataSyncService = krxDataSyncService;
+        this.marketDataPort = marketDataPort;
         this.dartDataSyncService = dartDataSyncService;
         this.apiConfig = apiConfig;
         this.monitorCheckLogRepository = monitorCheckLogRepository;
@@ -113,18 +113,19 @@ public class DashboardController {
         Map<String, Object> tradeStats = portfolioService.getTradeStatistics();
         Map<String, Object> riskStatus = portfolioService.getRiskStatus();
 
-        // 한국투자증권 계좌 잔고 조회
+        // 브로커 계좌 잔고 조회
         String accountNumber = apiConfig.getKoreaInvestment().getAccountNumber();
-        long totalAssetAmount = 0;
-        long availableCashAmount = 0;
+        BigDecimal totalAssetAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal availableCashAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         boolean accountConnected = false;
 
-        // P6: 포트가 broker-중립 BrokerBalance를 반환. 표시 모델 속성명(totalAssetAmount/availableCashAmount)과
-        // long 타입은 종전과 동일 → dashboard.html 바인딩 무변경.
+        // P8: USD 매매로 전환되며 센트(소수 2자리)가 유의미해졌다. 종전 long(toLong FLOOR 절삭)은
+        // 센트를 유실하므로 BrokerBalance의 BigDecimal을 2자리 스케일로 보존해 모델에 넣는다.
+        // 속성명(totalAssetAmount/availableCashAmount)은 유지하되 타입만 long → BigDecimal(2자리)로 승격.
         BrokerBalance balance = fetchBalanceResilient();
         if (balance != null && balance.success()) {
-            totalAssetAmount = toLong(balance.totalEval());
-            availableCashAmount = toLong(balance.availableCash());
+            totalAssetAmount = toMoney(balance.totalEval());
+            availableCashAmount = toMoney(balance.availableCash());
             accountConnected = true;
         }
 
@@ -233,8 +234,10 @@ public class DashboardController {
         return cachedBalance;
     }
 
-    private long toLong(BigDecimal value) {
-        return value != null ? value.setScale(0, RoundingMode.FLOOR).longValue() : 0L;
+    /** 표시용 금액을 센트(2자리)로 정규화한다. null은 0.00. USD 센트 유실 방지(P8). */
+    private BigDecimal toMoney(BigDecimal value) {
+        return value != null ? value.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     @PostMapping("/trade/run")
@@ -250,7 +253,7 @@ public class DashboardController {
     public String syncPrices(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         try {
             java.time.LocalDate today = java.time.LocalDate.now();
-            int count = krxDataSyncService.syncAllActiveStocks(today.minusDays(7), today);
+            int count = marketDataPort.syncAllActiveStocks(today.minusDays(7), today);
             redirectAttributes.addFlashAttribute("tradeResult", "가격 동기화 완료: " + count + "건 저장");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("tradeResult", "가격 동기화 실패: " + e.getMessage());

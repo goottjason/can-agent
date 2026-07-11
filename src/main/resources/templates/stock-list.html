@@ -32,8 +32,8 @@
         .badge-active { background: #d4edda; color: #155724; }
         .badge-inactive { background: #f8d7da; color: #721c24; }
         .market-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
-        .market-kospi { background: #e3f2fd; color: #1565c0; }
-        .market-kosdaq { background: #fff3e0; color: #e65100; }
+        .market-nyse { background: #e3f2fd; color: #1565c0; }
+        .market-nasdaq { background: #fff3e0; color: #e65100; }
         .inline-form { display: inline; }
         .table-link { text-decoration: none; }
         .table-link.code { color: #3498db; }
@@ -60,12 +60,12 @@
                         <div class="number" th:text="${totalActiveCount}">0</div>
                     </div>
                     <div class="stat-card">
-                        <h4>KOSPI</h4>
-                        <div class="number" th:text="${kospiCount}">0</div>
+                        <h4>NYSE</h4>
+                        <div class="number" th:text="${nyseCount}">0</div>
                     </div>
                     <div class="stat-card">
-                        <h4>KOSDAQ</h4>
-                        <div class="number" th:text="${kosdaqCount}">0</div>
+                        <h4>NASDAQ</h4>
+                        <div class="number" th:text="${nasdaqCount}">0</div>
                     </div>
                 </div>
 
@@ -74,8 +74,8 @@
                         <input type="text" name="keyword" th:value="${keyword}" placeholder="종목명 또는 코드 검색...">
                         <select name="market">
                             <option value="">전체 시장</option>
-                            <option value="KOSPI" th:selected="${market == 'KOSPI'}">KOSPI</option>
-                            <option value="KOSDAQ" th:selected="${market == 'KOSDAQ'}">KOSDAQ</option>
+                            <option value="NYSE" th:selected="${market == 'NYSE'}">NYSE</option>
+                            <option value="NASDAQ" th:selected="${market == 'NASDAQ'}">NASDAQ</option>
                         </select>
                         <button type="submit" class="btn btn-primary">검색</button>
                     </form>
@@ -118,8 +118,8 @@
                                 </td>
                                 <td>
                                     <span class="market-tag"
-                                          th:classappend="${stock.market == 'KOSPI'} ? 'market-kospi' : 'market-kosdaq'"
-                                          th:text="${stock.market}">KOSPI</span>
+                                          th:classappend="${stock.market == 'NYSE'} ? 'market-nyse' : 'market-nasdaq'"
+                                          th:text="${stock.market}">NYSE</span>
                                 </td>
                                 <td>
                                     <span class="status-badge" th:classappend="${stock.active} ? 'badge-active' : 'badge-inactive'"
@@ -160,17 +160,17 @@
             <form th:action="@{/stocks}" method="post">
                 <div class="form-group">
                     <label for="code">종목 코드</label>
-                    <input type="text" id="code" name="code" required placeholder="예: 005930" maxlength="10">
+                    <input type="text" id="code" name="code" required placeholder="예: AAPL" maxlength="10">
                 </div>
                 <div class="form-group">
                     <label for="name">종목명</label>
-                    <input type="text" id="name" name="name" required placeholder="예: 삼성전자" maxlength="100">
+                    <input type="text" id="name" name="name" required placeholder="예: Apple Inc." maxlength="100">
                 </div>
                 <div class="form-group">
                     <label for="market">시장</label>
                     <select id="market" name="market" required>
-                        <option value="KOSPI">KOSPI</option>
-                        <option value="KOSDAQ">KOSDAQ</option>
+                        <option value="NYSE">NYSE</option>
+                        <option value="NASDAQ">NASDAQ</option>
                     </select>
                 </div>
                 <div class="form-group">

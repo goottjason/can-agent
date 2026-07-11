@@ -53,6 +53,10 @@ toss:
   app-secret: "${TOSS_APP_SECRET:}"
   base-url: "${TOSS_BASE_URL:https://openapi.tossinvest.com}"
   token-url: "${TOSS_TOKEN_URL:}"        # 비우면 base-url + token-path 조합
+  broker:
+    # P8(broker 전환): true면 TossBrokerAdapter(@Primary)가 주문/잔고 BrokerPort로 주입된다(KIS는 폴백).
+    # us-pivot 기본은 켜짐(미국 소수·USD 주문). 실주문은 토스 키·PoC 상수 확정 후 가능(미확정 시 토큰 없이 실패).
+    enabled: "${TOSS_BROKER_ENABLED:true}"
 
 # 자동매매 스케줄
 trading:

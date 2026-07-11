@@ -49,8 +49,10 @@ public class StockController {
         model.addAttribute("keyword", keyword);
         model.addAttribute("market", market);
         model.addAttribute("totalActiveCount", stockService.getActiveStockCount());
-        model.addAttribute("kospiCount", stockService.getStockCountByMarket("KOSPI"));
-        model.addAttribute("kosdaqCount", stockService.getStockCountByMarket("KOSDAQ"));
+        // P8: 미국 대전환. Stock.market에는 US 종목의 거래소명(NYSE/NASDAQ, SecTickerUniverseLoader가 exchange를
+        // market에 기록)이 담긴다. 국내 KOSPI/KOSDAQ 카운트를 미국 거래소 카운트로 교체(표시 수준, 쿼리는 market 기반 그대로).
+        model.addAttribute("nyseCount", stockService.getStockCountByMarket("NYSE"));
+        model.addAttribute("nasdaqCount", stockService.getStockCountByMarket("NASDAQ"));
         model.addAttribute("activeMenu", "stocks");
 
         return "stock-list";
@@ -137,8 +139,8 @@ public class StockController {
     public ResponseEntity<Map<String, Object>> getStats() {
         return ResponseEntity.ok(Map.of(
                 "totalActive", stockService.getActiveStockCount(),
-                "kospi", stockService.getStockCountByMarket("KOSPI"),
-                "kosdaq", stockService.getStockCountByMarket("KOSDAQ")
+                "nyse", stockService.getStockCountByMarket("NYSE"),
+                "nasdaq", stockService.getStockCountByMarket("NASDAQ")
         ));
     }
 
