@@ -2,6 +2,7 @@ package com.canagent.web;
 
 import com.canagent.domain.stock.Stock;
 import com.canagent.service.StockService;
+import com.canagent.service.edgar.SecTickerUniverseLoader;
 import com.canagent.worker.DataSyncScheduler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +20,15 @@ public class StockController {
 
     private final StockService stockService;
     private final DataSyncScheduler dataSyncScheduler;
+    private final SecTickerUniverseLoader universeLoader;
 
     @Autowired
     public StockController(StockService stockService,
-                           @Autowired(required = false) DataSyncScheduler dataSyncScheduler) {
+                           @Autowired(required = false) DataSyncScheduler dataSyncScheduler,
+                           SecTickerUniverseLoader universeLoader) {
         this.stockService = stockService;
         this.dataSyncScheduler = dataSyncScheduler;
+        this.universeLoader = universeLoader;
     }
 
     @GetMapping
@@ -115,6 +119,24 @@ public class StockController {
                 "totalActive", stockService.getActiveStockCount(),
                 "nyse", stockService.getStockCountByMarket("NYSE"),
                 "nasdaq", stockService.getStockCountByMarket("NASDAQ")
+        ));
+    }
+
+    /**
+     * 미국 유니버스 적재. 클래스패스의 {@code company_tickers.json}(SEC 대형주)을 읽어
+     * ticker/cik/exchange를 Stock으로 upsert한다. market에는 거래소명(NYSE/NASDAQ)이 기록된다.
+     * P9에서 제거된 KRX {@code /sync}의 미국판 대체. 반환은 upsert 건수.
+     */
+    @PostMapping("/load-universe")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> loadUniverse() {
+        int upserted = universeLoader.loadFromClasspath();
+        return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "upserted", upserted,
+                "nyse", stockService.getStockCountByMarket("NYSE"),
+                "nasdaq", stockService.getStockCountByMarket("NASDAQ"),
+                "message", "미국 유니버스 적재 완료: " + upserted + "종목"
         ));
     }
 

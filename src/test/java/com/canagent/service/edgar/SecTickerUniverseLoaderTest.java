@@ -72,4 +72,30 @@ class SecTickerUniverseLoaderTest {
 
         assertThat(existing.getCik()).isEqualTo("320193");
     }
+
+    @Test
+    @DisplayName("같은 CIK 공유 이중상장 클래스는 별도 종목으로 upsert(GOOG/GOOGL 병합 방지)")
+    void sameCikDifferentTicker_notMerged() throws Exception {
+        SecTickerUniverseLoader loader = new SecTickerUniverseLoader(stockRepository);
+        // GOOGL은 이미 적재돼 CIK 1652044를 점유. GOOG(같은 CIK, 다른 ticker)가 들어와도
+        // findByCik 폴백이 GOOGL 행을 재사용하면 안 된다.
+        Stock googl = new Stock("GOOGL", "Alphabet Inc.", "NASDAQ", null);
+        googl.applyUsIdentifiers("GOOGL", "1652044", "NASDAQ", "USD", null);
+        when(stockRepository.findByTicker("GOOG")).thenReturn(Optional.empty());
+        when(stockRepository.findByCik("1652044")).thenReturn(Optional.of(googl));
+
+        InputStream in = new java.io.ByteArrayInputStream(
+                ("{\"0\":{\"cik_str\":1652044,\"ticker\":\"GOOG\","
+                        + "\"title\":\"Alphabet Inc.\",\"exchange\":\"NASDAQ\"}}").getBytes());
+        int count = loader.load(in);
+
+        assertThat(count).isEqualTo(1);
+        ArgumentCaptor<Stock> saved = ArgumentCaptor.forClass(Stock.class);
+        verify(stockRepository).save(saved.capture());
+        // 저장된 것은 GOOGL 행이 아니라 새 GOOG 행이어야 한다
+        assertThat(saved.getValue().getTicker()).isEqualTo("GOOG");
+        assertThat(saved.getValue()).isNotSameAs(googl);
+        // GOOGL 행은 GOOG로 덮어써지지 않고 그대로 유지
+        assertThat(googl.getTicker()).isEqualTo("GOOGL");
+    }
 }

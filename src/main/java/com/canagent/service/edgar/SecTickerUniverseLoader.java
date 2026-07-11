@@ -91,8 +91,11 @@ public class SecTickerUniverseLoader {
     }
 
     private void upsertStock(String ticker, String cik, String exchange, String title) {
+        // ticker 우선 매칭. ticker 미발견 시에만 cik로 폴백하되, 그 cik 행이 이미 다른 ticker에
+        // 귀속돼 있으면 재사용하지 않는다(같은 CIK 공유 이중상장 클래스 GOOG/GOOGL를 별도 행으로 유지).
         Stock stock = stockRepository.findByTicker(ticker)
-                .or(() -> stockRepository.findByCik(cik))
+                .or(() -> stockRepository.findByCik(cik)
+                        .filter(s -> s.getTicker() == null || ticker.equals(s.getTicker())))
                 .orElse(null);
 
         if (stock == null) {
