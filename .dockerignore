@@ -1,8 +1,11 @@
+# 멀티스테이지(소스) 빌드용: src·gradle 래퍼는 포함, 산출물·민감파일은 제외.
 .git
 .gradle
-!build/libs
-src
+build
+_workspace*
+docs
 *.md
-.env*
+.env
+.env.*
 *.key
 *.pem
