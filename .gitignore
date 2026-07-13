@@ -39,3 +39,6 @@ logs/
 # Harness workspace (휘발성 중간 산출물)
 _workspace/
 _workspace_*/
+
+# 복권 사이드카 크리덴셜 (커밋 금지)
+sidecar/lottery/.env
