@@ -80,7 +80,10 @@ public class LotteryPurchaseService {
     private String formatPurchase(SidecarResult result) {
         StringBuilder sb = new StringBuilder("🎫 복권 구매 완료\n");
         for (PurchasedTicket t : result.tickets()) {
-            String name = t.gameType() == GameType.LOTTO645 ? "로또6/45" : "연금복권720+";
+            String name = switch (t.gameType()) {
+                case LOTTO645 -> "로또6/45";
+                case WIN720   -> "연금복권720+";
+            };
             sb.append("• ").append(name).append(" ").append(t.roundNo()).append("회 [")
               .append(t.numbers()).append("] ").append(t.amount()).append("원\n");
         }
