@@ -1,5 +1,6 @@
 package com.canagent.config;
 
+import com.canagent.domain.lottery.GameType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,9 +16,14 @@ public class LotteryConfig {
     private int balanceThreshold = 3000;     // 예치금 알림 임계(원)
     private List<String> sidecarCommand = new ArrayList<>();  // 예: [python3, /opt/canagent/sidecar/lottery/buy.py]
     private int sidecarTimeoutSec = 120;
+    // 자동구매 대상 게임. 배포 시 서버 env(LOTTERY_GAMES=LOTTO645)로 로또만 제한 가능.
+    // 연금(WIN720)은 사이드카 Playwright 미구현이라 실구매 활성 전까지 제외 권장.
+    private List<GameType> games = new ArrayList<>(List.of(GameType.LOTTO645, GameType.WIN720));
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public List<GameType> getGames() { return games; }
+    public void setGames(List<GameType> games) { this.games = games; }
     public boolean isDryRun() { return dryRun; }
     public void setDryRun(boolean dryRun) { this.dryRun = dryRun; }
     public int getBalanceThreshold() { return balanceThreshold; }

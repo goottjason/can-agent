@@ -115,4 +115,17 @@ class LotteryPurchaseServiceTest {
 
         assertThat(messages).anyMatch(m -> m.contains("복권 구매 실패") && m.contains("WIN720"));
     }
+
+    @Test
+    @DisplayName("games 설정이 로또만이면 로또만 사이드카에 요청한다")
+    void restrictsToConfiguredGames() {
+        config.setGames(List.of(GameType.LOTTO645));
+        when(repo.existsByGameTypeAndPurchasedAtAfter(any(), any())).thenReturn(false);
+        TrackingSidecar port = new TrackingSidecar();
+        LotteryPurchaseService svc = new LotteryPurchaseService(port, repo, router, config, clock);
+
+        svc.buyWeekly();
+
+        assertThat(port.requested).containsExactly(GameType.LOTTO645);
+    }
 }
