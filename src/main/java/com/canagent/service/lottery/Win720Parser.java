@@ -13,6 +13,8 @@ public final class Win720Parser {
     private static final Logger log = LoggerFactory.getLogger(Win720Parser.class);
     // "3조" 형태에서 조 번호 추출
     private static final Pattern JO = Pattern.compile("(\\d)\\s*조");
+    // <span class="num">숫자</span> 패턴
+    private static final Pattern NUM = Pattern.compile("class=\"num\"[^>]*>\\s*(\\d)\\s*<");
 
     private Win720Parser() {}
 
@@ -39,9 +41,10 @@ public final class Win720Parser {
     private static String extractDigits(String html, String blockClass) {
         int start = html.indexOf(blockClass);
         if (start < 0) return "";
-        // 해당 블록 이후 구간에서 <span class="num">d</span> 패턴의 숫자를 최대 6개 모은다.
-        String region = html.substring(start);
-        Matcher m = Pattern.compile("class=\"num\"[^>]*>\\s*(\\d)\\s*<").matcher(region);
+        // 해당 블록만 슬라이스 — 다음 <div 시작 전까지만 탐색해 인접 블록 유출을 방지한다.
+        int end = html.indexOf("<div", start + 1);
+        String region = end > 0 ? html.substring(start, end) : html.substring(start);
+        Matcher m = NUM.matcher(region);
         StringBuilder sb = new StringBuilder();
         while (m.find() && sb.length() < 6) {
             sb.append(m.group(1));
