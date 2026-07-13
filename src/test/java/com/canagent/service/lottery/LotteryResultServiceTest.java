@@ -81,4 +81,45 @@ class LotteryResultServiceTest {
         verify(repo).save(t);
         assertThat(messages).anyMatch(m -> m.contains("1등"));
     }
+
+    @Test
+    @DisplayName("숫자 파싱 실패 티켓은 건너뛰고 다음 티켓 처리를 계속한다")
+    void malformedTicketDoesNotAbortBatch() {
+        LotteryTicket bad = new LotteryTicket(GameType.LOTTO645, 1100, "3,x,12,25,33,41", 1000, LocalDateTime.now());
+        LotteryTicket good = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(bad, good));
+        when(lottoClient.getWinningNumbers(1100))
+                .thenReturn(new LottoDraw(1100, List.of(3, 7, 12, 25, 33, 41), 10, 2_000_000_000L, true));
+
+        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
+        // 배치 전체가 예외로 중단되지 않아야 한다
+        svc.checkLotto();
+
+        assertThat(bad.isResultChecked()).isFalse();   // 파싱 실패 — 상태 변경 없음
+        assertThat(good.getRank()).isEqualTo(1);        // 다음 티켓은 정상 처리
+        verify(repo, never()).save(bad);
+        verify(repo).save(good);
+        assertThat(messages).anyMatch(m -> m.contains("1등"));
+    }
+
+    @Test
+    @DisplayName("같은 회차 티켓 2개 — 당첨번호 API는 1회만 호출된다(캐시)")
+    void sameRoundCachedDraw() {
+        LotteryTicket t1 = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+        LotteryTicket t2 = new LotteryTicket(GameType.LOTTO645, 1100, "1,2,3,4,5,6", 1000, LocalDateTime.now());
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t1, t2));
+        when(lottoClient.getWinningNumbers(1100))
+                .thenReturn(new LottoDraw(1100, List.of(3, 7, 12, 25, 33, 41), 10, 2_000_000_000L, true));
+
+        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
+        svc.checkLotto();
+
+        // 같은 회차이므로 API 1회만 호출
+        verify(lottoClient, times(1)).getWinningNumbers(1100);
+        // 두 티켓 모두 처리
+        assertThat(t1.isResultChecked()).isTrue();
+        assertThat(t2.isResultChecked()).isTrue();
+        verify(repo).save(t1);
+        verify(repo).save(t2);
+    }
 }

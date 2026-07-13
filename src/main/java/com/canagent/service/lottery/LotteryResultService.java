@@ -40,15 +40,19 @@ public class LotteryResultService {
         StringBuilder summary = new StringBuilder();
 
         for (LotteryTicket t : pending) {
-            LottoDraw draw = cache.computeIfAbsent(t.getRoundNo(), lottoClient::getWinningNumbers);
-            if (!draw.success()) continue;   // 아직 미추첨 — 저장하지 않음
-            List<Integer> nums = Arrays.stream(t.getNumbers().split(",")).map(Integer::parseInt).toList();
-            int rank = LotteryRankCalculator.lottoRank(nums, draw);
-            String label = LotteryPrizeFormatter.lotto(rank, draw);
-            t.applyResult(rank, label);
-            repository.save(t);
-            summary.append("• 로또 ").append(t.getRoundNo()).append("회 [").append(t.getNumbers())
-                   .append("] → ").append(label).append("\n");
+            try {
+                LottoDraw draw = cache.computeIfAbsent(t.getRoundNo(), lottoClient::getWinningNumbers);
+                if (!draw.success()) continue;   // 아직 미추첨 — 저장하지 않음
+                List<Integer> nums = Arrays.stream(t.getNumbers().split(",")).map(Integer::parseInt).toList();
+                int rank = LotteryRankCalculator.lottoRank(nums, draw);
+                String label = LotteryPrizeFormatter.lotto(rank, draw);
+                t.applyResult(rank, label);
+                repository.save(t);
+                summary.append("• 로또 ").append(t.getRoundNo()).append("회 [").append(t.getNumbers())
+                       .append("] → ").append(label).append("\n");
+            } catch (Exception e) {
+                log.error("복권 당첨확인 처리 실패 (id={}, numbers={}): {}", t.getId(), t.getNumbers(), e.getMessage());
+            }
         }
         if (summary.length() > 0) {
             router.sendText("🎯 로또 당첨확인\n" + summary);
@@ -64,17 +68,21 @@ public class LotteryResultService {
         StringBuilder summary = new StringBuilder();
 
         for (LotteryTicket t : pending) {
-            Win720Draw draw = cache.computeIfAbsent(t.getRoundNo(), win720Client::getWinningNumbers);
-            if (!draw.success()) continue;   // 아직 미추첨 — 저장하지 않음
-            String[] parts = t.getNumbers().split(":");   // "조:6자리" 형식 파싱
-            int jo = Integer.parseInt(parts[0]);
-            String digits = parts[1];
-            int rank = LotteryRankCalculator.win720Rank(jo, digits, draw);
-            String label = LotteryPrizeFormatter.win720(rank);
-            t.applyResult(rank, label);
-            repository.save(t);
-            summary.append("• 연금 ").append(t.getRoundNo()).append("회 [").append(t.getNumbers())
-                   .append("] → ").append(label).append("\n");
+            try {
+                Win720Draw draw = cache.computeIfAbsent(t.getRoundNo(), win720Client::getWinningNumbers);
+                if (!draw.success()) continue;   // 아직 미추첨 — 저장하지 않음
+                String[] parts = t.getNumbers().split(":");   // "조:6자리" 형식 파싱
+                int jo = Integer.parseInt(parts[0]);
+                String digits = parts[1];
+                int rank = LotteryRankCalculator.win720Rank(jo, digits, draw);
+                String label = LotteryPrizeFormatter.win720(rank);
+                t.applyResult(rank, label);
+                repository.save(t);
+                summary.append("• 연금 ").append(t.getRoundNo()).append("회 [").append(t.getNumbers())
+                       .append("] → ").append(label).append("\n");
+            } catch (Exception e) {
+                log.error("복권 당첨확인 처리 실패 (id={}, numbers={}): {}", t.getId(), t.getNumbers(), e.getMessage());
+            }
         }
         if (summary.length() > 0) {
             router.sendText("🎯 연금복권 당첨확인\n" + summary);
