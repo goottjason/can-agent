@@ -86,8 +86,11 @@ lottery:
   enabled: ${LOTTERY_ENABLED:false}     # 안전: 기본 비활성
   dry-run: ${LOTTERY_DRY_RUN:true}      # 안전: 기본 구매 안 함
   balance-threshold: 3000
-  sidecar-command: ${LOTTERY_SIDECAR_CMD:}   # 예: "python3,/opt/canagent/sidecar/lottery/buy.py"
+  # 컨테이너 내 venv 파이썬 + 사이드카 경로(콤마구분 → List). 예: /app/sidecar/lottery/.venv/bin/python,/app/sidecar/lottery/buy.py
+  sidecar-command: ${LOTTERY_SIDECAR_CMD:}
   sidecar-timeout-sec: 120
+  # 자동구매 대상(콤마구분). 연금(WIN720) 실구매 활성 전까지 서버 env로 LOTTERY_GAMES=LOTTO645 권장.
+  games: ${LOTTERY_GAMES:LOTTO645,WIN720}
   buy-cron: "0 0 9 * * TUE"
   win720-result-cron: "0 15 19 * * THU"
   lotto-result-cron: "0 45 20 * * SAT"

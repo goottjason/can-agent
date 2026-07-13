@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
-import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -48,12 +47,13 @@ public class LotteryPurchaseService {
         LocalDateTime weekStart = nowKst.toLocalDate()
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
 
-        List<GameType> pending = Arrays.stream(GameType.values())
+        // 설정된 게임(lottery.games)만 대상. 배포 시 LOTTERY_GAMES=LOTTO645로 연금 제외 가능.
+        List<GameType> pending = config.getGames().stream()
                 .filter(g -> !repository.existsByGameTypeAndPurchasedAtAfter(g, weekStart))
                 .toList();
 
         if (pending.isEmpty()) {
-            log.info("이번 주 복권 이미 구매됨 — 스킵");
+            log.info("이번 주 복권 이미 구매됨(또는 대상 게임 없음) — 스킵");
             return;
         }
 
