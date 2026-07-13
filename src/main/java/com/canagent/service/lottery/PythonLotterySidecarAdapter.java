@@ -59,6 +59,7 @@ public class PythonLotterySidecarAdapter implements LotterySidecarPort {
     private String runProcess(List<String> cmd) throws Exception {
         log.info("복권 사이드카 실행: {}", cmd);
         ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.redirectErrorStream(true);  // stderr를 stdout에 병합 — 파이프 버퍼 데드락 방지
         Process process = pb.start();
         String stdout = new String(process.getInputStream().readAllBytes());
         boolean done = process.waitFor(config.getSidecarTimeoutSec(), TimeUnit.SECONDS);
