@@ -25,7 +25,16 @@ public class TelegramNotificationService implements NotificationService {
     @Override
     public void send(NotificationEvent event) {
         if (!isEnabled()) return;
+        dispatch(event.formatMessage());
+    }
 
+    @Override
+    public void sendText(String message) {
+        if (!isEnabled()) return;
+        dispatch(message);
+    }
+
+    private void dispatch(String message) {
         try {
             String url = String.format("https://api.telegram.org/bot%s/sendMessage",
                     config.getTelegram().getBotToken());
@@ -33,7 +42,6 @@ public class TelegramNotificationService implements NotificationService {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            String message = event.formatMessage();
             String jsonBody = String.format(
                     "{\"chat_id\":\"%s\",\"text\":\"%s\",\"parse_mode\":\"HTML\"}",
                     config.getTelegram().getChatId(),

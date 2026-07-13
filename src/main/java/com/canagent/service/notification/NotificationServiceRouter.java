@@ -35,6 +35,19 @@ public class NotificationServiceRouter {
         }
     }
 
+    public void sendText(String message) {
+        for (NotificationService service : services) {
+            if (service.isEnabled()) {
+                try {
+                    service.sendText(message);
+                } catch (Exception e) {
+                    log.error("텍스트 알림 전송 실패 ({}): {}",
+                            service.getChannelName(), e.getMessage());
+                }
+            }
+        }
+    }
+
     public List<String> getEnabledChannels() {
         return services.stream()
                 .filter(NotificationService::isEnabled)

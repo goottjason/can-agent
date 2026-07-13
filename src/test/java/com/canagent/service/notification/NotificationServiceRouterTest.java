@@ -71,6 +71,29 @@ class NotificationServiceRouterTest {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("sendText는 활성 채널에만 전달한다")
+    void sendText_fansOutToEnabledOnly() {
+        java.util.List<String> received = new java.util.ArrayList<>();
+        NotificationService enabled = new NotificationService() {
+            public void send(NotificationEvent e) {}
+            public void sendText(String m) { received.add(m); }
+            public String getChannelName() { return "on"; }
+            public boolean isEnabled() { return true; }
+        };
+        NotificationService disabled = new NotificationService() {
+            public void send(NotificationEvent e) {}
+            public void sendText(String m) { received.add("SHOULD_NOT"); }
+            public String getChannelName() { return "off"; }
+            public boolean isEnabled() { return false; }
+        };
+        NotificationServiceRouter router = new NotificationServiceRouter(java.util.List.of(enabled, disabled));
+
+        router.sendText("예치금 부족");
+
+        org.assertj.core.api.Assertions.assertThat(received).containsExactly("예치금 부족");
+    }
+
+    @Test
     @DisplayName("전체 알림 전송 실패해도 다른 채널에 영향을 주지 않는다")
     void sendNotification_oneFailsOthersStillCalled() {
         NotificationService failingService = mock(NotificationService.class);
