@@ -26,11 +26,17 @@ public class LottoResultClient {
     }
 
     public LottoDraw getWinningNumbers(int roundNo) {
-        String body = restTemplate.getForObject(URL + roundNo, String.class);
-        return parse(body);
+        try {
+            String body = restTemplate.getForObject(URL + roundNo, String.class);
+            return parse(body);
+        } catch (Exception e) {
+            log.error("로또 당첨 조회 실패 (회차 {}): {}", roundNo, e.getMessage());
+            return new LottoDraw(0, List.of(), 0, 0, false);
+        }
     }
 
     LottoDraw parse(String json) {
+        if (json == null) return new LottoDraw(0, List.of(), 0, 0, false);
         try {
             JsonNode n = mapper.readTree(json);
             boolean success = "success".equals(n.path("returnValue").asText());
