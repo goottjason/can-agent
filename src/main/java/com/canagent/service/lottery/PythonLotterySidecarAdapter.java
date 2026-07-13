@@ -57,6 +57,12 @@ public class PythonLotterySidecarAdapter implements LotterySidecarPort {
     }
 
     private String runProcess(List<String> cmd) throws Exception {
+        // 명령 미설정 시 ProcessBuilder의 모호한 IOException 대신 명확한 메시지로 조기 실패
+        if (config.getSidecarCommand().isEmpty()
+                || config.getSidecarCommand().get(0).isBlank()) {
+            throw new IllegalStateException(
+                "lottery.sidecar-command 미설정 — YAML 배열로 설정 필요, 예: [\"python3\", \"/opt/canagent/sidecar/lottery/buy.py\"]");
+        }
         log.info("복권 사이드카 실행: {}", cmd);
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);  // stderr를 stdout에 병합 — 파이프 버퍼 데드락 방지

@@ -45,4 +45,14 @@ class PythonLotterySidecarAdapterTest {
         assertThat(r.errors()).hasSize(1);
         assertThat(r.errors().get(0).reason()).isEqualTo("로그인 실패");
     }
+
+    @Test
+    @DisplayName("sidecar-command 미설정이면 오류 SidecarResult를 반환한다(크래시 없음)")
+    void emptyCommand_returnsErrorResult() {
+        LotteryConfig cfg = new LotteryConfig();   // sidecarCommand 기본 빈 리스트
+        PythonLotterySidecarAdapter a = new PythonLotterySidecarAdapter(cfg, new com.fasterxml.jackson.databind.ObjectMapper());
+        SidecarResult r = a.purchaseWeekly(java.util.List.of(GameType.LOTTO645));
+        assertThat(r.ok()).isFalse();
+        assertThat(r.errors()).isNotEmpty();
+    }
 }
