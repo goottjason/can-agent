@@ -80,3 +80,14 @@ notification:
     chat-id: ${TELEGRAM_CHAT_ID:}
   console:
     enabled: true                # 콘솔 로그 알림 (항상 권장)
+
+# 복권 자동구매 설정
+lottery:
+  enabled: ${LOTTERY_ENABLED:false}     # 안전: 기본 비활성
+  dry-run: ${LOTTERY_DRY_RUN:true}      # 안전: 기본 구매 안 함
+  balance-threshold: 3000
+  sidecar-command: ${LOTTERY_SIDECAR_CMD:}   # 예: "python3,/opt/canagent/sidecar/lottery/buy.py"
+  sidecar-timeout-sec: 120
+  buy-cron: "0 0 9 * * TUE"
+  win720-result-cron: "0 15 19 * * THU"
+  lotto-result-cron: "0 45 20 * * SAT"
