@@ -2,17 +2,13 @@ package com.canagent.service.lottery;
 
 import com.canagent.service.lottery.dto.LottoDraw;
 
-import java.text.DecimalFormat;
-
 public final class LotteryPrizeFormatter {
-
-    private static final DecimalFormat WON = new DecimalFormat("#,##0");
 
     private LotteryPrizeFormatter() {}
 
     public static String lotto(int rank, LottoDraw draw) {
         return switch (rank) {
-            case 1 -> "1등 (" + WON.format(draw.firstWinAmount()) + "원)";
+            case 1 -> "1등 (" + String.format("%,d", draw.firstWinAmount()) + "원)";
             case 2 -> "2등";
             case 3 -> "3등";
             case 4 -> "4등 (50,000원)";

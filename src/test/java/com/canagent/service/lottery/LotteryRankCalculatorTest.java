@@ -77,12 +77,45 @@ class LotteryRankCalculatorTest {
     }
 
     @Test
+    @DisplayName("로또 4등: 4개 일치")
+    void lottoFourth() {
+        // 3,7,12,25 일치(4개), 44·45는 당첨번호에 없고 보너스(10)도 아님
+        assertThat(LotteryRankCalculator.lottoRank(List.of(3, 7, 12, 25, 44, 45), lotto)).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("연금 4등: 뒤 4자리 일치")
+    void winFourth() {
+        // "123456" 기준: 뒤 4자리 "3456" 일치, 5번째 자리 '9'≠'2'
+        assertThat(LotteryRankCalculator.win720Rank(1, "993456", win)).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("연금 5등: 뒤 3자리 일치")
+    void winFifth() {
+        // "123456" 기준: 뒤 3자리 "456" 일치, 4번째 자리 '9'≠'3'
+        assertThat(LotteryRankCalculator.win720Rank(1, "999456", win)).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("연금 6등: 뒤 2자리 일치")
+    void winSixth() {
+        // "123456" 기준: 뒤 2자리 "56" 일치, 3번째 자리 '9'≠'4'
+        assertThat(LotteryRankCalculator.win720Rank(1, "999956", win)).isEqualTo(6);
+    }
+
+    @Test
     @DisplayName("상금 라벨: 로또 1등은 당첨금 포함")
     void prizeLabels() {
         assertThat(LotteryPrizeFormatter.lotto(1, lotto)).contains("1등");
+        assertThat(LotteryPrizeFormatter.lotto(4, lotto)).contains("4등");
         assertThat(LotteryPrizeFormatter.lotto(5, lotto)).contains("5등");
         assertThat(LotteryPrizeFormatter.lotto(0, lotto)).isEqualTo("미당첨");
         assertThat(LotteryPrizeFormatter.win720(1)).contains("1등");
+        assertThat(LotteryPrizeFormatter.win720(4)).contains("4등");
+        assertThat(LotteryPrizeFormatter.win720(5)).contains("5등");
+        assertThat(LotteryPrizeFormatter.win720(6)).contains("6등");
+        assertThat(LotteryPrizeFormatter.win720(7)).contains("7등");
         assertThat(LotteryPrizeFormatter.win720(8)).contains("보너스");
         assertThat(LotteryPrizeFormatter.win720(0)).isEqualTo("미당첨");
     }
