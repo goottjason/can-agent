@@ -22,6 +22,11 @@ public class ConsoleNotificationService implements NotificationService {
     }
 
     @Override
+    public void sendText(String message) {
+        log.info("===== 알림 =====\n{}", message);
+    }
+
+    @Override
     public String getChannelName() {
         return "console";
     }
