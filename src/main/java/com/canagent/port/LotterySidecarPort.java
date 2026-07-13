@@ -14,6 +14,8 @@ public interface LotterySidecarPort {
     /** 지정 게임만 구매하고 결과·구매후잔액을 반환. */
     SidecarResult purchaseWeekly(List<GameType> games);
 
-    /** 예치금 잔액만 조회(구매 없음). */
-    int getBalance();
+    /** 예치금 잔액만 조회(구매 없음). 테스트 Fake는 purchaseWeekly만 구현하면 되도록 default 제공. */
+    default int getBalance() {
+        throw new UnsupportedOperationException("getBalance() 미구현");
+    }
 }
