@@ -29,7 +29,7 @@ T=12
 [[ -z "${TOSS_APP_KEY:-}" || -z "${TOSS_APP_SECRET:-}" ]] && { echo "✋ TOSS_APP_KEY/SECRET 없음"; exit 1; }
 command -v python3 >/dev/null || { echo "✋ python3 필요(JSON 파싱)"; exit 1; }
 pp(){ python3 -m json.tool 2>/dev/null || cat; }
-jget(){ python3 -c "import sys,json;d=json.load(sys.stdin);print(eval('d'+'$1') if d else '')" 2>/dev/null; }
+jget(){ python3 -c "import sys,json;d=json.load(sys.stdin);print(eval('d'+sys.argv[1]) if d else '')" "$1" 2>/dev/null; }
 uuid(){ echo "poc-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"; }
 hr(){ printf '%.0s─' {1..70}; echo; }
 
@@ -86,7 +86,7 @@ limit-cancel)   # PHASE 1 — 무체결(안전): 낮은 지정가 매수 → 상
   echo "  ✓ orderId=$OID"; hr
   sleep 1; order_detail "$OID"; hr
   echo "▶ 주문 취소 POST /api/v1/orders/$OID/cancel"
-  curl -s -m$T -X POST "${AUTH[@]}" "${ACCH[@]}" "$BASE_URL/api/v1/orders/$OID/cancel" | pp; echo
+  curl -s -m$T -X POST "${AUTH[@]}" "${ACCH[@]}" "${JSON[@]}" "$BASE_URL/api/v1/orders/$OID/cancel" | pp; echo
   sleep 1; echo "▶ 취소 후 상세(상태 CANCELED 확인):"; order_detail "$OID"
   echo "✅ PHASE1 완료 — 주문 생성/상세/취소 배관 검증(무체결). 돈 안 나감."
   ;;
