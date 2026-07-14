@@ -1,21 +1,19 @@
 name: Deploy can-agent
 
-# ⚠️ 현재 "수동 실행(workflow_dispatch)"만 활성. main push 자동배포는 비활성.
-# 이유: main = 미국 대전환 코드이나 실서버 준비 미완(환전·prod toss.broker.enabled·
-#       DB 마이그레이션·유니버스 적재·승인). 준비 완료 전 자동배포 시 실계좌 매매가 깨진다.
+# main push = 서버 SSH → git pull + docker compose up --build 자동배포 (2026-07-14 활성화, 사용자 결정).
+# ⚠️ main = 미국 대전환/실계좌 매매 코드. push 즉시 배포되므로, 실서버 준비(환전·prod
+#    toss.broker.enabled·DB 마이그레이션·유니버스 적재)가 안 된 커밋은 main에 올리지 말 것.
+#    (자동배포 끄려면 아래 push: 블록을 다시 주석 처리.)
 #
-# 미국 실서버 준비 완료 후 아래 `push:` 블록 주석을 해제하면 sbshop처럼
-# main push = 서버 SSH → git pull + docker compose up --build 자동배포가 된다.
-#
-# 1회 설정: 저장소 Settings → Secrets and variables → Actions →
-#   CANAGENT_DEPLOY_KEY = ssh-key-2026-06-25.key 파일의 전체 내용(개인키)
+# 시크릿(등록됨): Settings → Secrets and variables → Actions →
+#   CANAGENT_DEPLOY_KEY = ssh-key-2026-06-25.key 개인키 전체 내용.
 # 서버 전제(2026-07-14 분리): ~/projects/can-agent 가 origin/main pull 가능한 git 체크아웃 +
 #   자기 docker-compose.yml + .env 보유. postgres·nginx 는 ~/projects/infra 공유 인프라.
 
 on:
-  workflow_dispatch: {}   # 수동 실행 (Actions 탭 → Run workflow)
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # 수동 실행도 허용 (Actions 탭 → Run workflow)
 
 concurrency:
   group: deploy-canagent-main
