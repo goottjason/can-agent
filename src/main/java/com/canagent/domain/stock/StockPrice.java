@@ -67,6 +67,23 @@ public class StockPrice {
         this.changeRate = changeRate;
     }
 
+    /**
+     * 장중 스팟 현재가를 반영한다: close를 최신 스팟으로 갱신하고 high/low를 확장한다.
+     * open·volume은 보존한다(정식 캔들/시가 불변). null 스팟은 무시한다.
+     */
+    public void applyIntradaySpot(BigDecimal price) {
+        if (price == null) {
+            return;
+        }
+        this.close = price;
+        if (this.high == null || price.compareTo(this.high) > 0) {
+            this.high = price;
+        }
+        if (this.low == null || price.compareTo(this.low) < 0) {
+            this.low = price;
+        }
+    }
+
     public BigDecimal getRange() {
         if (high == null || low == null || high.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;

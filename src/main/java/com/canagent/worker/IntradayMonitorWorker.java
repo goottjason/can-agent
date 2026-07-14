@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.canagent.port.BrokerPort;
 import com.canagent.port.dto.BrokerBalance;
 import com.canagent.service.MarketHours;
+import com.canagent.service.StockPriceUpserter;
 import com.canagent.service.TradingStrategyService;
 import com.canagent.service.TradingStrategyService.TradingDecision;
 import com.canagent.service.analysis.CanSlimAnalysisService;
@@ -54,6 +55,7 @@ public class IntradayMonitorWorker {
     private final MonitorCheckLogRepository monitorCheckLogRepository;
     private final ObjectMapper objectMapper;
     private final MarketHours marketHours;
+    private final StockPriceUpserter stockPriceUpserter;
 
     @Value("${trading.max-positions:10}")
     private int maxPositions;
@@ -82,7 +84,8 @@ public class IntradayMonitorWorker {
             NotificationServiceRouter notificationServiceRouter,
             MonitorCheckLogRepository monitorCheckLogRepository,
             ObjectMapper objectMapper,
-            MarketHours marketHours) {
+            MarketHours marketHours,
+            StockPriceUpserter stockPriceUpserter) {
         this.stockRepository = stockRepository;
         this.stockPriceRepository = stockPriceRepository;
         this.portfolioRepository = portfolioRepository;
@@ -95,6 +98,7 @@ public class IntradayMonitorWorker {
         this.monitorCheckLogRepository = monitorCheckLogRepository;
         this.objectMapper = objectMapper;
         this.marketHours = marketHours;
+        this.stockPriceUpserter = stockPriceUpserter;
     }
 
     // ET 09:30~16:00 정규장. 09:00~09:29 틱은 isTradingHours(ET 개장) 게이트가 필터한다.
@@ -358,13 +362,10 @@ public class IntradayMonitorWorker {
 
     private void saveCurrentPrice(Stock stock, BigDecimal currentPrice) {
         try {
-            // P6: 포트가 스팟 현재가만 반환(OHLC·거래량 없음). 장중 임시 저장은 현재가로 O/H/L/C를 채운다.
-            // 정식 OHLC·거래량은 캔들 동기화 경로(MarketDataPort)가 채운다(§4.1).
-            StockPrice stockPrice = new StockPrice(
-                    stock,
-                    marketHours.todayEt(),
-                    currentPrice, currentPrice, currentPrice, currentPrice, 0L);
-            stockPriceRepository.save(stockPrice);
+            // P6: 포트가 스팟 현재가만 반환(OHLC·거래량 없음). 멱등 upsert-갱신:
+            // 오늘 행이 없으면 O/H/L/C=현재가·volume 0 임시행 INSERT, 있으면 close 갱신·high/low 확장(open·volume 보존).
+            // 정식 OHLC·거래량은 캔들 동기화 경로(MarketDataPort)가 채운다(§4.1). 매 사이클 재-INSERT 유니크 위반 소멸.
+            stockPriceUpserter.upsertIntradaySpot(stock, marketHours.todayEt(), currentPrice);
         } catch (Exception e) {
             log.error("현재가 저장 실패: {} - {}", stock.getCode(), e.getMessage());
         }

@@ -53,4 +53,27 @@ public class StockPriceUpserter {
         }
         return stockPriceRepository.save(stockPrice);
     }
+
+    /**
+     * 장중 스팟 현재가를 (stock, date)에 멱등하게 반영한다.
+     *
+     * <p>행이 없으면 O=H=L=C=현재가·volume 0 임시행을 INSERT, 있으면 그 행의
+     * {@link StockPrice#applyIntradaySpot(BigDecimal)}로 close 갱신·high/low 확장(open·volume 보존).
+     * 매 사이클 재-INSERT로 인한 유니크 위반을 제거한다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public StockPrice upsertIntradaySpot(Stock stock, LocalDate date, BigDecimal currentPrice) {
+        Optional<StockPrice> existing = stockPriceRepository
+                .findByStockIdAndDateBetweenOrderByDateAsc(stock.getId(), date, date)
+                .stream()
+                .findFirst();
+        if (existing.isPresent()) {
+            StockPrice sp = existing.get();
+            sp.applyIntradaySpot(currentPrice);
+            return stockPriceRepository.save(sp);
+        }
+        StockPrice stockPrice = new StockPrice(stock, date,
+                currentPrice, currentPrice, currentPrice, currentPrice, 0L);
+        return stockPriceRepository.save(stockPrice);
+    }
 }
