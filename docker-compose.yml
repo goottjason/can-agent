@@ -1,0 +1,38 @@
+# can-agent 전용 compose (2026-07-14 배포 라인 분리).
+# 공유 인프라(postgres·nginx)는 ~/projects/infra 에서 별도 관리하며,
+# can-agent 컨테이너는 external network 'shared-net' 에 붙어 postgres/nginx 와 통신한다.
+# 배포: cd ~/projects/can-agent && docker compose up -d --build  (GitHub Actions 가 수행)
+services:
+  can-agent:
+    build: .
+    container_name: projects-can-agent-1
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: canagent
+      DB_USERNAME: canagent
+      DB_PASSWORD: ${PG_PASSWORD:-canagent1234}
+      DART_API_KEY: ${DART_API_KEY}
+      KRX_API_KEY: ${KRX_API_KEY}
+      KOREA_INVESTMENT_APP_KEY: ${KOREA_INVESTMENT_APP_KEY}
+      KOREA_INVESTMENT_APP_SECRET: ${KOREA_INVESTMENT_APP_SECRET}
+      KOREA_INVESTMENT_ACCOUNT_NUMBER: ${KOREA_INVESTMENT_ACCOUNT_NUMBER}
+      KOREA_INVESTMENT_IS_REAL: ${KOREA_INVESTMENT_IS_REAL:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      KAKAO_WEBHOOK_URL: ${KAKAO_WEBHOOK_URL}
+      TRADE_SECRET: ${TRADE_SECRET}
+      TOSS_APP_KEY: ${TOSS_APP_KEY}
+      TOSS_APP_SECRET: ${TOSS_APP_SECRET}
+      TOSS_ACCOUNT: ${TOSS_ACCOUNT}
+      TOSS_BROKER_ENABLED: ${TOSS_BROKER_ENABLED:-false}
+      REAL_TRADING: ${REAL_TRADING:-true}
+      EDGAR_USER_AGENT: ${EDGAR_USER_AGENT}
+    networks:
+      - shared-net
+    restart: unless-stopped
+
+networks:
+  shared-net:
+    external: true

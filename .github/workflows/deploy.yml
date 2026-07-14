@@ -1,4 +1,4 @@
-name: Deploy to server
+name: Deploy can-agent
 
 # ⚠️ 현재 "수동 실행(workflow_dispatch)"만 활성. main push 자동배포는 비활성.
 # 이유: main = 미국 대전환 코드이나 실서버 준비 미완(환전·prod toss.broker.enabled·
@@ -9,8 +9,8 @@ name: Deploy to server
 #
 # 1회 설정: 저장소 Settings → Secrets and variables → Actions →
 #   CANAGENT_DEPLOY_KEY = ssh-key-2026-06-25.key 파일의 전체 내용(개인키)
-# 서버 전제: ~/projects/can-agent 가 origin/main 을 pull 가능한 git 체크아웃,
-#           ~/projects/docker-compose.yml 에 can-agent 서비스 정의.
+# 서버 전제(2026-07-14 분리): ~/projects/can-agent 가 origin/main pull 가능한 git 체크아웃 +
+#   자기 docker-compose.yml + .env 보유. postgres·nginx 는 ~/projects/infra 공유 인프라.
 
 on:
   workflow_dispatch: {}   # 수동 실행 (Actions 탭 → Run workflow)
@@ -18,14 +18,14 @@ on:
   #   branches: [main]
 
 concurrency:
-  group: deploy-main
+  group: deploy-canagent-main
   cancel-in-progress: false   # 배포 중복 방지(진행 중이면 대기)
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: SSH deploy (git pull + docker compose up --build)
+      - name: SSH deploy (can-agent 자기 compose만)
         env:
           SSH_KEY: ${{ secrets.CANAGENT_DEPLOY_KEY }}
           SERVER: 168.107.31.154
@@ -43,8 +43,9 @@ jobs:
             set -euo pipefail
             cd ~/projects/can-agent
             git pull origin main
-            cd ~/projects
-            docker compose up -d --build can-agent
+            docker compose up -d --build
+            # 컨테이너 재생성 후 nginx가 옛 IP를 캐시하므로 reload 필수
+            docker exec projects-nginx-1 nginx -s reload
           REMOTE
 
       - name: Healthcheck
@@ -63,4 +64,4 @@ jobs:
             echo "::error::배포 헬스체크 실패 (HTTP $code)"
             exit 1
           fi
-          echo "✅ 배포 성공 (HTTP $code)"
+          echo "✅ can-agent 배포 성공 (HTTP $code)"
