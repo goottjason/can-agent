@@ -4,6 +4,11 @@
 계약: {"ok": bool, "balanceAfter": int, "tickets": [...], "errors": [...]}
   tickets[].numbers: 로또 "3,7,12,25,33,41" / 연금 "조:6자리" 예 "3:123456"
 로그는 stderr로만 보낸다(stdout은 JSON 전용).
+
+로또(LOTTO645): dhapi>=4 순수 HTTP(RSA 로그인, OCR 불필요).
+  dhapi 4.x는 show_balance/buy_lotto645가 값을 반환하지 않고 endpoint 프린터로
+  출력하므로, 값을 캡처하는 _CaptureEndpoint를 주입한다.
+연금(WIN720): Playwright — 라이브 codegen 확정 후 구현(Phase C).
 """
 import argparse
 import json
@@ -21,64 +26,144 @@ def log(msg):
     print(msg, file=sys.stderr)
 
 
-def _lotto_client():
-    """dhapi 로그인 클라이언트 반환. dhapi 버전에 맞춰 조정한다."""
-    from dhapi.router.dhlottery_client import DhlotteryClient  # dhapi 내부 클라이언트
-    client = DhlotteryClient()
-    client.login(DH_USER, DH_PASSWORD)
-    return client
+class _CaptureEndpoint:
+    """dhapi LotteryClient가 stdout으로 출력하는 대신 값을 캡처한다.
+
+    dhapi.endpoint.lottery_stdout_printer.LotteryStdoutPrinter 와 동일 인터페이스."""
+
+    def __init__(self):
+        self.total = None      # 총예치금
+        self.buyable = None    # 구매가능금액(crntEntrsAmt)
+        self.slots = None      # buy_lotto645 결과 slot 목록
+
+    def print_result_of_show_balance(self, *, 총예치금, 구매가능금액, 예약구매금액,
+                                     출금신청중금액, 구매불가능금액, 최근1달누적구매금액):
+        self.total = int(총예치금 or 0)
+        self.buyable = int(구매가능금액 or 0)
+
+    def print_result_of_buy_lotto645(self, slots):
+        self.slots = slots
+
+    # 미사용 프린터(혹시 호출돼도 안전)
+    def print_result_of_assign_virtual_account(self, *a, **k):
+        pass
+
+    def print_result_of_show_buy_list(self, *a, **k):
+        pass
 
 
-def get_balance(client):
-    """예치금 조회. dhapi의 잔액 조회 API에 맞춰 반환(int 원)."""
-    return int(client.get_balance())
+def _client_and_endpoint():
+    """dhapi 4.x LotteryClient 생성(생성자에서 RSA HTTP 자동 로그인) + 캡처 endpoint."""
+    from dhapi.domain.user import User
+    from dhapi.port.lottery_client import LotteryClient
+    ep = _CaptureEndpoint()
+    client = LotteryClient(User(DH_USER, DH_PASSWORD), ep)
+    return client, ep
 
 
-def buy_lotto(client, dry_run):
+def get_balance(client, ep):
+    """구매가능금액(원, int). show_balance가 endpoint로 값을 넘긴다."""
+    client.show_balance()
+    return int(ep.buyable if ep.buyable is not None else 0)
+
+
+def buy_lotto(client, ep, dry_run):
     if dry_run:
         return None
-    # 자동 1게임 구매. dhapi buy_lotto645 반환에서 회차·번호를 정규화한다.
-    result = client.buy_lotto645(count=1, mode="auto")
-    round_no = int(result["round"])
-    nums = sorted(int(x) for x in result["numbers"][0])   # 첫 게임 6자리
+    from dhapi.domain.lotto645_ticket import Lotto645Ticket
+    # 자동 1게임 구매(랜덤). buy_lotto645는 결과를 endpoint.print_result_of_buy_lotto645로 넘긴다.
+    tickets = Lotto645Ticket.create_auto_tickets(1)
+    client.buy_lotto645(tickets)
+    round_no = int(client._get_round())          # dhapi 내부 회차 계산 재사용
+    slot = (ep.slots or [{}])[0]
+    raw = slot.get("numbers", [])                # 예 ["01","02","04","27","39","44"]
+    nums = sorted(int(x) for x in raw)
     return {"gameType": "LOTTO645", "roundNo": round_no,
             "numbers": ",".join(str(n) for n in nums), "amount": 1000}
 
 
-def buy_win720(dry_run):
-    """연금복권720+ 자동 1조 구매(Playwright). 선택자는 라이브에서 codegen으로 확정한다."""
+_WIN720_URL = "https://el.dhlottery.co.kr/game/TotalGame.jsp?LottoId=LP72"
+
+
+def _session_cookies(client):
+    """dhapi LotteryClient의 인증 세션 쿠키를 Playwright 형식으로 변환.
+    RSA HTTP 로그인 세션을 재사용하므로 연금 로그인·보안키패드 OCR이 불필요하다."""
+    out = []
+    for ck in client._session.cookies:
+        dom = ck.domain if ck.domain.startswith(".") else "." + ck.domain.lstrip(".")
+        out.append({"name": ck.name, "value": ck.value, "domain": dom, "path": ck.path or "/"})
+    return out
+
+
+def buy_win720(client, dry_run):
+    """연금복권720+ 자동 1조 1장 구매(Playwright + 세션쿠키 주입, OCR 불필요).
+
+    흐름(라이브 확정, 2026-07-16): 게임 iframe(ifrm_tab) 진입 → 랜덤 단일 조 선택
+    → 자동번호(doAuto) → 선택완료(doVerify) → doOrder(확인창 자동수락)
+    → doOrderRequest(실구매). '모든 조'는 5장(5000원)이 되므로 단일 조로 1장만 산다."""
     if dry_run:
         return None
+    import random
     from playwright.sync_api import sync_playwright
+
+    jo = str(random.randint(1, 5))
+    cookies = _session_cookies(client)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        # 1) 로그인 → 2) 연금복권720+ 게임 페이지 → 3) 자동선택 → 4) 구매확정
-        # 아래 선택자는 `playwright codegen https://dhlottery.co.kr` 로 확정 후 교체한다.
-        round_no, jo, digits = _win720_interaction(page)
-        browser.close()
+        ctx = browser.new_context(viewport={"width": 1100, "height": 900})
+        ctx.add_cookies(cookies)
+        page = ctx.new_page()
+        page.on("dialog", lambda d: d.accept())   # doOrder 확인창 자동수락
+        try:
+            round_no, jo_num, digits = _win720_interaction(page, jo)
+        finally:
+            browser.close()
     return {"gameType": "WIN720", "roundNo": int(round_no),
-            "numbers": f"{jo}:{digits}", "amount": 1000}
+            "numbers": f"{jo_num}:{digits}", "amount": 1000}
 
 
-def _win720_interaction(page):
-    """실제 DOM 조작. techinpark/lottery-bot의 win720 흐름을 참고해 채운다.
-    반환: (round_no, jo, digits) — digits는 6자리 문자열."""
-    raise NotImplementedError("Playwright 선택자를 라이브 codegen으로 확정 후 구현")
+def _win720_interaction(page, jo):
+    """연금 게임 iframe DOM 조작. 반환: (round_no, jo, digits)."""
+    page.goto(_WIN720_URL, timeout=25000, wait_until="networkidle")
+    page.wait_for_timeout(2500)
+    fr = page.frame(name="ifrm_tab")
+    if fr is None:
+        raise RuntimeError("연금 게임 프레임(ifrm_tab)을 찾지 못함")
+    # 인트로 팝업 닫기(있으면)
+    for el in fr.query_selector_all("a.lotto720_popup_bottom_btn_close"):
+        try:
+            if el.is_visible():
+                el.click(); page.wait_for_timeout(300)
+        except Exception:
+            pass
+    fr.click(f"span.lotto720_box.jogroup.num{jo}"); page.wait_for_timeout(400)   # 단일 조
+    fr.click("a.lotto720_btn_auto_number"); page.wait_for_timeout(700)           # 자동 6자리
+    fr.click("a.lotto720_btn_confirm_number"); page.wait_for_timeout(900)        # 선택 완료(doVerify)
+    buyno = fr.evaluate("()=>{var e=document.querySelector('#frm input[name=BUY_NO]'); return e?e.value:'';}")
+    rnd = fr.evaluate("()=>{var e=document.getElementById('DROUND')||document.getElementById('ROUND'); return e?e.value:'';}")
+    if not buyno or not rnd:
+        raise RuntimeError(f"연금 번호/회차 미확정 (BUY_NO={buyno!r}, ROUND={rnd!r})")
+    # 클릭은 확인창과 엉키므로 JS 함수 직접 호출
+    fr.evaluate("()=>doOrder()"); page.wait_for_timeout(1500)                    # 확인팝업(확인창 자동수락)
+    fr.evaluate("()=>doOrderRequest()"); page.wait_for_timeout(6000)            # 실구매
+    body = fr.inner_text("body")
+    if "구매가 완료" not in body and "구매완료" not in body:
+        raise RuntimeError("연금 구매 완료 미확인: " + " ".join(body.split())[:200])
+    return int(rnd), buyno[0], buyno[1:]   # BUY_NO 예 "4481478" → (324, "4", "481478")
 
 
 def cmd_balance():
-    client = _lotto_client()
-    return {"ok": True, "balanceAfter": get_balance(client), "tickets": [], "errors": []}
+    client, ep = _client_and_endpoint()
+    return {"ok": True, "balanceAfter": get_balance(client, ep), "tickets": [], "errors": []}
 
 
 def cmd_buy(games, dry_run):
     tickets, errors = [], []
-    client = _lotto_client()
+    client, ep = _client_and_endpoint()
 
     if "LOTTO645" in games:
         try:
-            t = buy_lotto(client, dry_run)
+            t = buy_lotto(client, ep, dry_run)
             if t:
                 tickets.append(t)
         except Exception as e:
@@ -86,13 +171,13 @@ def cmd_buy(games, dry_run):
 
     if "WIN720" in games:
         try:
-            t = buy_win720(dry_run)
+            t = buy_win720(client, dry_run)
             if t:
                 tickets.append(t)
         except Exception as e:
             errors.append({"gameType": "WIN720", "reason": str(e)})
 
-    balance = get_balance(client)
+    balance = get_balance(client, ep)
     return {"ok": len(errors) == 0, "balanceAfter": balance, "tickets": tickets, "errors": errors}
 
 

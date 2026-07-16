@@ -1,3 +1,3 @@
-dhapi>=1.3.0
+dhapi>=4.2.0
 playwright>=1.40.0
 python-dotenv>=1.0.0
