@@ -95,4 +95,21 @@ public class Portfolio {
             this.active = false;
         }
     }
+
+    /** 청산 처리 — 하드삭제 대신 active=false로 비활성화(실계좌 동기화 등). */
+    public void deactivate() {
+        this.active = false;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 실계좌 보유(소스오브트루스)로 수량·평단을 덮어쓴다(실계좌 동기화).
+     * 부분 청산/추가매수 누적이 아닌 브로커 값 그대로의 재조정이다.
+     */
+    public void reconcileTo(BigDecimal quantity, BigDecimal averageBuyPrice) {
+        this.quantity = quantity;
+        this.averageBuyPrice = averageBuyPrice;
+        this.totalBuyAmount = averageBuyPrice.multiply(quantity);
+        this.updatedAt = LocalDateTime.now();
+    }
 }

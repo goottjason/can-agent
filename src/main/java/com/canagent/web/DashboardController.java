@@ -260,6 +260,18 @@ public class DashboardController {
         return "redirect:/";
     }
 
+    @PostMapping("/sync/portfolio")
+    public String syncPortfolio(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        try {
+            PortfolioService.ReconcileSummary summary = portfolioService.reconcileFromBroker();
+            redirectAttributes.addFlashAttribute("tradeResult", summary.message());
+        } catch (Exception e) {
+            log.error("실계좌 동기화 실패: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("tradeResult", "실계좌 동기화 실패: " + e.getMessage());
+        }
+        return "redirect:/";
+    }
+
     @PostMapping("/sync/financials")
     public String syncFinancials(org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         redirectAttributes.addFlashAttribute("tradeResult", "재무제표 동기화 시작 (백그라운드에서 실행 중)");

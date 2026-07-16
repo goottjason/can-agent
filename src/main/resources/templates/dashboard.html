@@ -270,6 +270,12 @@
                                     title="최근 7일간의 일별 시세를 전 활성 종목에 대해 내려받아 stock_prices에 저장합니다.">가격 동기화</button>
                             <span class="action-desc">최근 7일 시세 동기화</span>
                         </form>
+                        <form th:action="@{/sync/portfolio}" method="post" class="action-form"
+                              onsubmit="return confirm('실계좌 보유로 포트폴리오를 재동기화합니다. 진행할까요?');">
+                            <button type="submit" class="btn btn-primary"
+                                    title="브로커 실계좌의 실제 보유(holdings)를 소스오브트루스로 DB portfolio를 재조정합니다. 실계좌에 없는 종목은 청산 처리(active=false), 수량·평단이 다르면 갱신, 새 보유는 추가합니다. 잔고 조회 실패 시 아무것도 변경하지 않습니다.">실계좌 동기화</button>
+                            <span class="action-desc">실계좌 보유 기준 포트폴리오 재조정</span>
+                        </form>
                         <form th:action="@{/sync/financials}" method="post" class="action-form">
                             <button type="submit" class="btn btn-primary"
                                     title="SEC EDGAR에서 재무제표(2025년 3분기, 2024년 3·4분기)를 백그라운드로 내려받아 저장합니다. 완료까지 시간이 걸립니다.">재무제표 동기화</button>
