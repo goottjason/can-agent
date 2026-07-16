@@ -29,6 +29,13 @@ services:
       TOSS_BROKER_ENABLED: ${TOSS_BROKER_ENABLED:-false}
       REAL_TRADING: ${REAL_TRADING:-true}
       EDGAR_USER_AGENT: ${EDGAR_USER_AGENT}
+      # 복권 사이드카(로또 dhapi + 연금 Playwright). 기본 안전값(비활성·dry-run).
+      LOTTERY_ENABLED: ${LOTTERY_ENABLED:-false}
+      LOTTERY_DRY_RUN: ${LOTTERY_DRY_RUN:-true}
+      LOTTERY_SIDECAR_CMD: ${LOTTERY_SIDECAR_CMD:-/app/sidecar/lottery/.venv/bin/python,/app/sidecar/lottery/buy.py}
+      LOTTERY_GAMES: ${LOTTERY_GAMES:-LOTTO645,WIN720}
+      DH_USER: ${DH_USER}
+      DH_PASSWORD: ${DH_PASSWORD}
     networks:
       - shared-net
     restart: unless-stopped
