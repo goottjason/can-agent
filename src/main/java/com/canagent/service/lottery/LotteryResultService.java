@@ -42,7 +42,7 @@ public class LotteryResultService {
         for (LotteryTicket t : pending) {
             try {
                 LottoDraw draw = cache.computeIfAbsent(t.getRoundNo(), lottoClient::getWinningNumbers);
-                if (!draw.success()) continue;   // 아직 미추첨 — 저장하지 않음
+                if (!draw.success()) continue;   // 아직 미추첨 — 저장하지 않음. summary는 빈 채로 유지
                 List<Integer> nums = Arrays.stream(t.getNumbers().split(",")).map(Integer::parseInt).toList();
                 int rank = LotteryRankCalculator.lottoRank(nums, draw);
                 String label = LotteryPrizeFormatter.lotto(rank, draw);
@@ -54,10 +54,15 @@ public class LotteryResultService {
                 log.error("복권 당첨확인 처리 실패 (id={}, numbers={}): {}", t.getId(), t.getNumbers(), e.getMessage());
             }
         }
+        // 발표날 크론 실행이므로 결과 유무와 무관하게 항상 알림 1건을 발송한다.
         if (summary.length() > 0) {
             router.sendText("🎯 로또 당첨확인\n" + summary);
+        } else if (pending.isEmpty()) {
+            log.info("로또 당첨확인: 확인할 티켓 없음");
+            router.sendText("🎯 로또 당첨확인: 확인할 티켓이 없습니다.");
         } else {
-            log.info("로또 당첨확인: 대상 없음");
+            log.info("로또 당첨확인: 대상 {}건이나 아직 추첨 결과 없음(미추첨)", pending.size());
+            router.sendText("🎯 로또 당첨확인: 아직 추첨 결과가 없습니다(미추첨).");
         }
     }
 
@@ -84,10 +89,15 @@ public class LotteryResultService {
                 log.error("복권 당첨확인 처리 실패 (id={}, numbers={}): {}", t.getId(), t.getNumbers(), e.getMessage());
             }
         }
+        // 발표날 크론 실행이므로 결과 유무와 무관하게 항상 알림 1건을 발송한다.
         if (summary.length() > 0) {
             router.sendText("🎯 연금복권 당첨확인\n" + summary);
+        } else if (pending.isEmpty()) {
+            log.info("연금 당첨확인: 확인할 티켓 없음");
+            router.sendText("🎯 연금복권 당첨확인: 확인할 티켓이 없습니다.");
         } else {
-            log.info("연금 당첨확인: 대상 없음");
+            log.info("연금 당첨확인: 대상 {}건이나 아직 추첨 결과 없음(미추첨)", pending.size());
+            router.sendText("🎯 연금복권 당첨확인: 아직 추첨 결과가 없습니다(미추첨).");
         }
     }
 }

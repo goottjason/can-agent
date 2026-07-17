@@ -54,7 +54,7 @@ class LotteryResultServiceTest {
     }
 
     @Test
-    @DisplayName("미추첨(success=false)이면 확인·저장하지 않는다")
+    @DisplayName("미추첨(success=false)이면 저장하지 않지만 미추첨 알림 1건은 발송한다")
     void skipWhenNotDrawn() {
         LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
         when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t));
@@ -65,6 +65,40 @@ class LotteryResultServiceTest {
 
         assertThat(t.isResultChecked()).isFalse();
         verify(repo, never()).save(any());
+        // 발표날 크론이므로 미추첨이어도 알림 1건 발송
+        verify(router, times(1)).sendText(anyString());
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("미추첨");
+    }
+
+    @Test
+    @DisplayName("로또 확인 티켓 0건이어도 발표날 알림 1건을 발송한다")
+    void lottoNotifiesEvenWhenNoTickets() {
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of());
+
+        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
+        svc.checkLotto();
+
+        verify(repo, never()).save(any());
+        verify(lottoClient, never()).getWinningNumbers(anyInt());
+        verify(router, times(1)).sendText(anyString());
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("확인할 티켓이 없습니다");
+    }
+
+    @Test
+    @DisplayName("연금 확인 티켓 0건이어도 발표날 알림 1건을 발송한다")
+    void win720NotifiesEvenWhenNoTickets() {
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.WIN720)).thenReturn(List.of());
+
+        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
+        svc.checkWin720();
+
+        verify(repo, never()).save(any());
+        verify(winClient, never()).getWinningNumbers(anyInt());
+        verify(router, times(1)).sendText(anyString());
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("확인할 티켓이 없습니다");
     }
 
     @Test

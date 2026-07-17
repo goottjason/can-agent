@@ -29,15 +29,15 @@ public class LotteryScheduler {
         purchaseService.buyWeekly();
     }
 
-    // 연금 추첨: 목 19:05 → 19:15 확인
-    @Scheduled(cron = "${lottery.win720-result-cron:0 15 19 * * THU}", zone = "Asia/Seoul")
+    // 연금 추첨: 목 밤 22:00 확인 (추첨 반영 여유 확보)
+    @Scheduled(cron = "${lottery.win720-result-cron:0 0 22 * * THU}", zone = "Asia/Seoul")
     public void checkWin720() {
         log.info("===== 연금복권 당첨확인 =====");
         resultService.checkWin720();
     }
 
-    // 로또 추첨: 토 20:35 → 20:45 확인
-    @Scheduled(cron = "${lottery.lotto-result-cron:0 45 20 * * SAT}", zone = "Asia/Seoul")
+    // 로또 추첨: 토 밤 22:00 확인 (추첨 API 반영 여유 확보)
+    @Scheduled(cron = "${lottery.lotto-result-cron:0 0 22 * * SAT}", zone = "Asia/Seoul")
     public void checkLotto() {
         log.info("===== 로또 당첨확인 =====");
         resultService.checkLotto();
