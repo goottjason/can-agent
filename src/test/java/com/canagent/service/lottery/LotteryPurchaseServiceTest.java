@@ -38,6 +38,7 @@ class LotteryPurchaseServiceTest {
         FakeSidecar(SidecarResult result) { this.result = result; }
         @Override public SidecarResult purchaseWeekly(List<GameType> games) { return result; }
         @Override public int getBalance() { throw new UnsupportedOperationException(); }
+        @Override public com.canagent.port.dto.SidecarResults checkResults() { throw new UnsupportedOperationException(); }
     }
 
     /** 요청 게임 목록을 기록하는 추적용 Fake 사이드카. */
@@ -48,6 +49,7 @@ class LotteryPurchaseServiceTest {
             return new SidecarResult(true, 8000, List.of(), List.of());
         }
         @Override public int getBalance() { throw new UnsupportedOperationException(); }
+        @Override public com.canagent.port.dto.SidecarResults checkResults() { throw new UnsupportedOperationException(); }
     }
 
     @BeforeEach

@@ -2,9 +2,12 @@ package com.canagent.service.lottery;
 
 import com.canagent.domain.lottery.GameType;
 import com.canagent.domain.lottery.LotteryTicket;
+import com.canagent.port.LotterySidecarPort;
+import com.canagent.port.dto.SidecarError;
+import com.canagent.port.dto.SidecarResult;
+import com.canagent.port.dto.SidecarResults;
+import com.canagent.port.dto.TicketResult;
 import com.canagent.repository.LotteryTicketRepository;
-import com.canagent.service.lottery.dto.LottoDraw;
-import com.canagent.service.lottery.dto.Win720Draw;
 import com.canagent.service.notification.NotificationServiceRouter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,52 +24,97 @@ import static org.mockito.Mockito.*;
 class LotteryResultServiceTest {
 
     private LotteryTicketRepository repo;
-    private LottoResultClient lottoClient;
-    private Win720ResultClient winClient;
     private NotificationServiceRouter router;
     private final List<String> messages = new ArrayList<>();
+
+    /** 고정된 SidecarResults를 반환하는 Fake 사이드카. */
+    private static class FakeSidecar implements LotterySidecarPort {
+        private final SidecarResults results;
+        FakeSidecar(SidecarResults results) { this.results = results; }
+        @Override public SidecarResult purchaseWeekly(List<GameType> games) { throw new UnsupportedOperationException(); }
+        @Override public int getBalance() { throw new UnsupportedOperationException(); }
+        @Override public SidecarResults checkResults() { return results; }
+    }
+
+    private LotteryResultService svc(SidecarResults results) {
+        return new LotteryResultService(repo, new FakeSidecar(results), router);
+    }
 
     @BeforeEach
     void setUp() {
         repo = mock(LotteryTicketRepository.class);
-        lottoClient = mock(LottoResultClient.class);
-        winClient = mock(Win720ResultClient.class);
         router = mock(NotificationServiceRouter.class);
         messages.clear();
         doAnswer(inv -> { messages.add(inv.getArgument(0)); return null; }).when(router).sendText(anyString());
     }
 
     @Test
-    @DisplayName("로또 당첨확인: 등수 반영·저장·알림")
-    void checkLotto() {
-        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+    @DisplayName("WIN 티켓: 당첨 반영(rank>0)·winner·저장·당첨 요약 알림")
+    void checkLottoWin() {
+        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1233, "3,7,12,25,33,41", 1000, LocalDateTime.now());
         when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t));
-        when(lottoClient.getWinningNumbers(1100))
-                .thenReturn(new LottoDraw(1100, List.of(3, 7, 12, 25, 33, 41), 10, 2_000_000_000L, true));
+        SidecarResults sr = new SidecarResults(true, List.of(
+                new TicketResult(GameType.LOTTO645, 1233, "WIN", 5000, "2026-07-18")), List.of());
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        svc.checkLotto();
+        svc(sr).checkLotto();
 
         assertThat(t.getRank()).isEqualTo(1);
+        assertThat(t.isWinner()).isTrue();
         assertThat(t.isResultChecked()).isTrue();
+        assertThat(t.getPrizeLabel()).contains("5,000");
         verify(repo).save(t);
-        assertThat(messages).anyMatch(m -> m.contains("1등"));
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("당첨");
     }
 
     @Test
-    @DisplayName("미추첨(success=false)이면 저장하지 않지만 미추첨 알림 1건은 발송한다")
-    void skipWhenNotDrawn() {
-        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+    @DisplayName("LOSE 티켓: 낙첨 반영(rank 0)·저장·낙첨 요약 알림")
+    void checkLottoLose() {
+        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1233, "1,2,3,4,5,6", 1000, LocalDateTime.now());
         when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t));
-        when(lottoClient.getWinningNumbers(1100)).thenReturn(new LottoDraw(0, List.of(), 0, 0, false));
+        SidecarResults sr = new SidecarResults(true, List.of(
+                new TicketResult(GameType.LOTTO645, 1233, "LOSE", 0, "2026-07-18")), List.of());
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        svc.checkLotto();
+        svc(sr).checkLotto();
+
+        assertThat(t.getRank()).isEqualTo(0);
+        assertThat(t.isWinner()).isFalse();
+        assertThat(t.isResultChecked()).isTrue();
+        verify(repo).save(t);
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("낙첨");
+    }
+
+    @Test
+    @DisplayName("PENDING 상태 티켓은 저장하지 않지만 미추첨 알림 1건은 발송한다")
+    void pendingNotSaved() {
+        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1233, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t));
+        SidecarResults sr = new SidecarResults(true, List.of(
+                new TicketResult(GameType.LOTTO645, 1233, "PENDING", 0, "2026-07-18")), List.of());
+
+        svc(sr).checkLotto();
 
         assertThat(t.isResultChecked()).isFalse();
         verify(repo, never()).save(any());
-        // 발표날 크론이므로 미추첨이어도 알림 1건 발송
         verify(router, times(1)).sendText(anyString());
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("미추첨");
+    }
+
+    @Test
+    @DisplayName("사이드카 결과에 매칭 회차가 없으면 저장하지 않고 미추첨 알림 1건")
+    void noMatchNotSaved() {
+        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 1233, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t));
+        // 다른 회차 결과만 존재 → 매칭 없음
+        SidecarResults sr = new SidecarResults(true, List.of(
+                new TicketResult(GameType.LOTTO645, 1200, "LOSE", 0, "2026-06-01")), List.of());
+
+        svc(sr).checkLotto();
+
+        assertThat(t.isResultChecked()).isFalse();
+        verify(repo, never()).save(any());
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0)).contains("미추첨");
     }
@@ -76,11 +124,9 @@ class LotteryResultServiceTest {
     void lottoNotifiesEvenWhenNoTickets() {
         when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of());
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        svc.checkLotto();
+        svc(new SidecarResults(true, List.of(), List.of())).checkLotto();
 
         verify(repo, never()).save(any());
-        verify(lottoClient, never()).getWinningNumbers(anyInt());
         verify(router, times(1)).sendText(anyString());
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0)).contains("확인할 티켓이 없습니다");
@@ -91,69 +137,59 @@ class LotteryResultServiceTest {
     void win720NotifiesEvenWhenNoTickets() {
         when(repo.findByGameTypeAndResultCheckedFalse(GameType.WIN720)).thenReturn(List.of());
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        svc.checkWin720();
+        svc(new SidecarResults(true, List.of(), List.of())).checkWin720();
 
         verify(repo, never()).save(any());
-        verify(winClient, never()).getWinningNumbers(anyInt());
         verify(router, times(1)).sendText(anyString());
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0)).contains("확인할 티켓이 없습니다");
     }
 
     @Test
-    @DisplayName("연금 당첨확인: 조:6자리 파싱·등수 반영")
-    void checkWin720() {
-        LotteryTicket t = new LotteryTicket(GameType.WIN720, 240, "3:123456", 1000, LocalDateTime.now());
+    @DisplayName("연금 WIN 티켓도 사이드카 결과로 당첨 반영·저장한다")
+    void checkWin720Win() {
+        LotteryTicket t = new LotteryTicket(GameType.WIN720, 324, "3:123456", 1000, LocalDateTime.now());
         when(repo.findByGameTypeAndResultCheckedFalse(GameType.WIN720)).thenReturn(List.of(t));
-        when(winClient.getWinningNumbers(240)).thenReturn(new Win720Draw(240, 3, "123456", "987654", true));
+        SidecarResults sr = new SidecarResults(true, List.of(
+                new TicketResult(GameType.WIN720, 324, "WIN", 1_000_000, "2026-07-18")), List.of());
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        svc.checkWin720();
+        svc(sr).checkWin720();
 
         assertThat(t.getRank()).isEqualTo(1);
+        assertThat(t.isWinner()).isTrue();
         verify(repo).save(t);
-        assertThat(messages).anyMatch(m -> m.contains("1등"));
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("당첨");
     }
 
     @Test
-    @DisplayName("숫자 파싱 실패 티켓은 건너뛰고 다음 티켓 처리를 계속한다")
-    void malformedTicketDoesNotAbortBatch() {
-        LotteryTicket bad = new LotteryTicket(GameType.LOTTO645, 1100, "3,x,12,25,33,41", 1000, LocalDateTime.now());
-        LotteryTicket good = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
-        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(bad, good));
-        when(lottoClient.getWinningNumbers(1100))
-                .thenReturn(new LottoDraw(1100, List.of(3, 7, 12, 25, 33, 41), 10, 2_000_000_000L, true));
+    @DisplayName("checkLotto는 다른 게임(WIN720) 결과를 무시하고 LOTTO645만 처리한다")
+    void checkLottoFiltersGameType() {
+        LotteryTicket t = new LotteryTicket(GameType.LOTTO645, 324, "3,7,12,25,33,41", 1000, LocalDateTime.now());
+        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t));
+        // 같은 회차 번호지만 게임이 다른 결과만 존재 → 매칭 없음(미추첨)
+        SidecarResults sr = new SidecarResults(true, List.of(
+                new TicketResult(GameType.WIN720, 324, "WIN", 5000, "2026-07-18")), List.of());
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        // 배치 전체가 예외로 중단되지 않아야 한다
-        svc.checkLotto();
+        svc(sr).checkLotto();
 
-        assertThat(bad.isResultChecked()).isFalse();   // 파싱 실패 — 상태 변경 없음
-        assertThat(good.getRank()).isEqualTo(1);        // 다음 티켓은 정상 처리
-        verify(repo, never()).save(bad);
-        verify(repo).save(good);
-        assertThat(messages).anyMatch(m -> m.contains("1등"));
+        assertThat(t.isResultChecked()).isFalse();
+        verify(repo, never()).save(any());
+        assertThat(messages.get(0)).contains("미추첨");
     }
 
     @Test
-    @DisplayName("같은 회차 티켓 2개 — 당첨번호 API는 1회만 호출된다(캐시)")
-    void sameRoundCachedDraw() {
-        LotteryTicket t1 = new LotteryTicket(GameType.LOTTO645, 1100, "3,7,12,25,33,41", 1000, LocalDateTime.now());
-        LotteryTicket t2 = new LotteryTicket(GameType.LOTTO645, 1100, "1,2,3,4,5,6", 1000, LocalDateTime.now());
-        when(repo.findByGameTypeAndResultCheckedFalse(GameType.LOTTO645)).thenReturn(List.of(t1, t2));
-        when(lottoClient.getWinningNumbers(1100))
-                .thenReturn(new LottoDraw(1100, List.of(3, 7, 12, 25, 33, 41), 10, 2_000_000_000L, true));
+    @DisplayName("사이드카 실패(ok=false)면 실패 알림을 보내고 저장·조회를 하지 않는다")
+    void sidecarFailure() {
+        SidecarResults sr = new SidecarResults(false, List.of(),
+                List.of(new SidecarError("ALL", "로그인 실패")));
 
-        LotteryResultService svc = new LotteryResultService(repo, lottoClient, winClient, router);
-        svc.checkLotto();
+        svc(sr).checkLotto();
 
-        // 같은 회차이므로 API 1회만 호출
-        verify(lottoClient, times(1)).getWinningNumbers(1100);
-        // 두 티켓 모두 처리
-        assertThat(t1.isResultChecked()).isTrue();
-        assertThat(t2.isResultChecked()).isTrue();
-        verify(repo).save(t1);
-        verify(repo).save(t2);
+        verify(repo, never()).findByGameTypeAndResultCheckedFalse(any());
+        verify(repo, never()).save(any());
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0)).contains("실패");
+        assertThat(messages.get(0)).contains("로그인 실패");
     }
 }

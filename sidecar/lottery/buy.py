@@ -152,6 +152,70 @@ def _win720_interaction(page, jo):
     return int(rnd), buyno[0], buyno[1:]   # BUY_NO 예 "4481478" → (324, "4", "481478")
 
 
+_LEDGER_URL = "https://www.dhlottery.co.kr/mypage/mylotteryledger"
+_GAME_MAP = {"로또6/45": "LOTTO645", "연금복권720+": "WIN720", "연금복권720": "WIN720"}
+_STATUS_MAP = {"당첨": "WIN", "낙첨": "LOSE", "추첨중": "PENDING", "미추첨": "PENDING"}
+
+
+def _parse_ledger_row(text):
+    """MY 당첨내역 행 텍스트 → {gameType, roundNo, status, winAmount, drawDate}."""
+    import re
+    t = " ".join(text.split())
+    gk = next((k for k in _GAME_MAP if k in t), None)
+    if gk is None:
+        return None
+    m_round = re.search(re.escape(gk) + r"\s+(\d+)", t)   # 게임명 뒤 첫 정수 = 회차
+    if not m_round:
+        return None
+    status = next((v for k, v in _STATUS_MAP.items() if k in t), None)
+    m_amt = re.search(r"([\d,]+)\s*원", t)
+    m_draw = re.search(r"추첨일자\s*(\d{4}-\d{2}-\d{2})", t)
+    return {"gameType": _GAME_MAP[gk], "roundNo": int(m_round.group(1)),
+            "status": status,
+            "winAmount": int(m_amt.group(1).replace(",", "")) if m_amt else 0,
+            "drawDate": m_draw.group(1) if m_draw else None}
+
+
+def check_results(client):
+    """인증 브라우저로 MY 구매/당첨 내역을 스크래핑해 게임·회차별 당첨/낙첨 반환.
+
+    공개 당첨번호 API가 서버(데이터센터) IP에서 차단되므로(익명 조회 302→홈),
+    구매와 동일한 인증 세션 쿠키를 브라우저에 주입해 MY 당첨내역을 읽는다."""
+    from playwright.sync_api import sync_playwright
+    cookies = _session_cookies(client)
+    rows = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(viewport={"width": 1280, "height": 1400})
+        ctx.add_cookies(cookies)
+        page = ctx.new_page()
+        try:
+            page.goto(_LEDGER_URL, timeout=25000, wait_until="networkidle")
+            page.wait_for_timeout(1500)
+            try:   # 조회기간 1개월 + 검색(기본 '당일'이면 최근 티켓 누락 방지)
+                page.get_by_text("1개월", exact=True).first.click(); page.wait_for_timeout(300)
+                page.get_by_role("button", name="검색").first.click(); page.wait_for_timeout(1800)
+            except Exception:
+                pass
+            rows = page.evaluate("""() => Array.from(document.querySelectorAll('table tbody tr, ul li'))
+                .map(e=>e.innerText.replace(/\\s+/g,' ').trim())
+                .filter(t=>/로또6\\/45|연금복권720/.test(t) && /구입일자/.test(t) && t.length<200)""")
+        finally:
+            browser.close()
+    seen, out = set(), []
+    for text in rows:
+        r = _parse_ledger_row(text)
+        if r and (r["gameType"], r["roundNo"]) not in seen:
+            seen.add((r["gameType"], r["roundNo"]))
+            out.append(r)
+    return out
+
+
+def cmd_result():
+    client, _ = _client_and_endpoint()
+    return {"ok": True, "results": check_results(client), "errors": []}
+
+
 def cmd_balance():
     client, ep = _client_and_endpoint()
     return {"ok": True, "balanceAfter": get_balance(client, ep), "tickets": [], "errors": []}
@@ -188,21 +252,24 @@ def main():
     buy_p.add_argument("--games", default="LOTTO645,WIN720")
     buy_p.add_argument("--dry-run", action="store_true")
     sub.add_parser("balance")
+    sub.add_parser("result")
     args = parser.parse_args()
 
     if not DH_USER or not DH_PASSWORD:
-        print(json.dumps({"ok": False, "balanceAfter": 0, "tickets": [],
+        print(json.dumps({"ok": False, "balanceAfter": 0, "tickets": [], "results": [],
                           "errors": [{"gameType": "ALL", "reason": "크리덴셜 미설정(.env)"}]}))
         return
 
     try:
         if args.cmd == "balance":
             out = cmd_balance()
+        elif args.cmd == "result":
+            out = cmd_result()
         else:
             games = [g.strip() for g in args.games.split(",") if g.strip()]
             out = cmd_buy(games, args.dry_run)
     except Exception as e:
-        out = {"ok": False, "balanceAfter": 0, "tickets": [],
+        out = {"ok": False, "balanceAfter": 0, "tickets": [], "results": [],
                "errors": [{"gameType": "ALL", "reason": str(e)}]}
 
     print(json.dumps(out, ensure_ascii=False))   # stdout 마지막 줄 = JSON

@@ -5,6 +5,7 @@ import com.canagent.domain.lottery.GameType;
 import com.canagent.port.LotterySidecarPort;
 import com.canagent.port.dto.SidecarError;
 import com.canagent.port.dto.SidecarResult;
+import com.canagent.port.dto.SidecarResults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,20 @@ public class PythonLotterySidecarAdapter implements LotterySidecarPort {
         List<String> cmd = new ArrayList<>(config.getSidecarCommand());
         cmd.add("balance");
         return runAndParse(cmd).balanceAfter();
+    }
+
+    @Override
+    public SidecarResults checkResults() {
+        List<String> cmd = new ArrayList<>(config.getSidecarCommand());
+        cmd.add("result");
+        try {
+            String out = runProcess(cmd);
+            return parseResultsJson(out);
+        } catch (Exception e) {
+            log.error("사이드카 결과조회 실행 실패: {}", e.getMessage());
+            return new SidecarResults(false, List.of(),
+                    List.of(new SidecarError("ALL", "사이드카 실행 실패: " + e.getMessage())));
+        }
     }
 
     private SidecarResult runAndParse(List<String> cmd) {
@@ -85,6 +100,17 @@ public class PythonLotterySidecarAdapter implements LotterySidecarPort {
         } catch (Exception e) {
             log.error("사이드카 JSON 파싱 실패: {} / raw={}", e.getMessage(), json);
             return new SidecarResult(false, 0, List.of(),
+                    List.of(new SidecarError("ALL", "JSON 파싱 실패")));
+        }
+    }
+
+    /** stdout JSON → SidecarResults. package-private(테스트 대상). */
+    SidecarResults parseResultsJson(String json) {
+        try {
+            return mapper.readValue(json, SidecarResults.class);
+        } catch (Exception e) {
+            log.error("사이드카 결과 JSON 파싱 실패: {} / raw={}", e.getMessage(), json);
+            return new SidecarResults(false, List.of(),
                     List.of(new SidecarError("ALL", "JSON 파싱 실패")));
         }
     }

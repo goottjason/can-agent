@@ -2,6 +2,7 @@ package com.canagent.port;
 
 import com.canagent.domain.lottery.GameType;
 import com.canagent.port.dto.SidecarResult;
+import com.canagent.port.dto.SidecarResults;
 
 import java.util.List;
 
@@ -16,4 +17,7 @@ public interface LotterySidecarPort {
 
     /** 예치금 잔액만 조회(구매 없음). */
     int getBalance();
+
+    /** 인증 브라우저로 MY 당첨내역을 스크래핑해 미확인 티켓의 당첨/낙첨/미확정을 판정. */
+    SidecarResults checkResults();
 }
