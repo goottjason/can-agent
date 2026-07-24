@@ -37,10 +37,10 @@ public class TradingStrategyService {
     private final BrokerPort brokerPort;
     private final ApiConfig apiConfig;
 
-    @Value("${trading.max-positions:10}")
+    @Value("${trading.max-positions:20}")
     private int maxPositions;
 
-    @Value("${trading.position-rate:10}")
+    @Value("${trading.position-rate:5}")
     private int positionRate;
 
     @Value("${trading.stop-loss-rate:7}")
@@ -72,6 +72,9 @@ public class TradingStrategyService {
         this.apiConfig = apiConfig;
     }
 
+    // NOTE: 이 단일 경로(evaluateBuy)는 현재 프로덕션 매수 경로가 아니다 — 장중 매수는
+    // IntradayMonitorWorker.planPurchases()가 담당한다(호출부 없음, 테스트만 참조).
+    // 정책 일관성을 위해 종목당 상한을 워커와 동일하게 총자산(현금+보유평가) 기준으로 계산한다.
     public TradingDecision evaluateBuy(Stock stock, BigDecimal currentPrice) {
         log.info("매수 평가: {} ({})", stock.getName(), stock.getCode());
 
@@ -104,10 +107,11 @@ public class TradingStrategyService {
             return TradingDecision.hold("점수 미충족: " + totalScore + " < " + minScore);
         }
 
-        // P6(§3): notional 사이징 — 정수 FLOOR 제거. 주문 금액 = 예수금 × positionRate/100.
-        // 소수 수량은 orderAmount/price로 도메인 기록용만 계산(소수 보존, 4자리).
-        BigDecimal maxInvestAmount = availableCash.multiply(new BigDecimal(positionRate))
+        // P6(§3): notional 사이징. 종목당 상한 = 총자산(현금+보유평가) × positionRate/100 (워커 planPurchases와 정합).
+        // 실제 배분은 가용현금 한도 내(min) — 현금 이상 배분 금지. 소수 수량은 도메인 기록용만 계산(4자리).
+        BigDecimal perPositionCap = balance.totalEval().multiply(new BigDecimal(positionRate))
                 .divide(new BigDecimal("100"), 2, RoundingMode.FLOOR);
+        BigDecimal maxInvestAmount = perPositionCap.min(availableCash);
 
         if (maxInvestAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return TradingDecision.hold("주문 금액 0 (예수금: " + availableCash + ")");

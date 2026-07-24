@@ -28,7 +28,7 @@
                     <table>
                         <tr><th>#</th><th>조건</th><th>상세</th></tr>
                         <tr><td>1</td><td>보유 종목 아님</td><td>이미 보유하고 있는 종목은 매수 스킵</td></tr>
-                        <tr><td>2</td><td>최대 보유 미도달</td><td>현재 보유 종목 수 < 10개</td></tr>
+                        <tr><td>2</td><td>최대 보유 미도달</td><td>현재 보유 종목 수 < 20개</td></tr>
                         <tr><td>3</td><td>예수금 존재</td><td>인출 가능 금액 > 0</td></tr>
                         <tr><td>4</td><td>종합 점수 충족</td><td>CANSLIM 점수 + 컵앤핸들 점수 ≥ <code>120</code>점</td></tr>
                         <tr><td>5</td><td>매수 신호 존재</td><td>CANSLIM 매수 신호(≥40점) 또는 컵앤핸들 매수 신호(BREAKOUT 또는 HANDLE_COMPLETE+CANSLIM≥40)</td></tr>
@@ -40,23 +40,27 @@
                 </div>
 
                 <div class="doc-card">
-                    <h2>포지션 사이징 (점수 기반 비례 배분)</h2>
-                    <p>총 예수금을 종목별 점수에 비례하여 배분합니다. 점수가 높은 종목에 더 많은 자금을 배정합니다.</p>
+                    <h2>포지션 사이징 (총자산 기준 고정 비중)</h2>
+                    <p>종목마다 <strong>총자산의 5%</strong>를 균일하게 배정합니다(최대 20종목). 점수가 높다고 더 많이 배정하지 않으며, 신호가 소수여도 남은 현금은 배분하지 않고 그대로 보유합니다(dry powder). 이는 소수 종목에 자금이 몰리는 것을 방지합니다.</p>
 
                     <div class="formula">
-                        <strong>매수 금액</strong> = 총 예수금 × 종목별 배분율(positionRate = 종목 점수 ÷ 매수 대상 총점)<br><br>
-                        <strong>매수 수량</strong> = 배분 금액 ÷ 현재가 → 소수 주식수. 소수점 금액 기반 시장가 매수(orderAmount)라 정수 내림 없음
+                        <strong>매수 금액</strong> = 총자산 × 종목당 비중(5%) — 점수·신호 수와 무관한 고정 비율<br><br>
+                        <strong>매수 수량</strong> = 배분 금액 ÷ 현재가 → 소수 주식수. 소수점 금액 기반 시장가 매수(orderAmount)라 정수 내림 없음<br><br>
+                        <strong>미배분 현금</strong> = 총자산 − (매수 종목 수 × 5%). 남은 현금은 재분배(reflow)하지 않고 대기 자금으로 보유합니다.
                     </div>
 
-                    <h3>예시</h3>
+                    <h3>예시 (총자산 $2,000 가정)</h3>
                     <table>
-                        <tr><th>종목</th><th>종합 점수</th><th>투자금 배분</th><th>비율</th></tr>
-                        <tr><td>A종목</td><td>150점</td><td>$150.00</td><td>50%</td></tr>
-                        <tr><td>B종목</td><td>120점</td><td>$120.00</td><td>40%</td></tr>
-                        <tr><td>C종목</td><td>30점</td><td>$30.00</td><td>10%</td></tr>
+                        <tr><th>종목</th><th>종합 점수</th><th>투자금 배분</th><th>총자산 대비</th></tr>
+                        <tr><td>A종목</td><td>150점</td><td>$100.00</td><td>5%</td></tr>
+                        <tr><td>B종목</td><td>120점</td><td>$100.00</td><td>5%</td></tr>
+                        <tr><td>C종목</td><td>30점</td><td>$100.00</td><td>5%</td></tr>
                         <tr style="background:#f0f7ff;font-weight:600;">
-                            <td>합계</td><td>300점</td><td>$300.00</td><td>100%</td></tr>
+                            <td>매수 합계 (3종목)</td><td>—</td><td>$300.00</td><td>15%</td></tr>
+                        <tr style="color:#888;">
+                            <td>미배분 현금 (보유)</td><td>—</td><td>$1,700.00</td><td>85%</td></tr>
                     </table>
+                    <p style="color:#888;font-size:0.9em;">※ 신호가 3건뿐이어도 남은 $1,700은 3종목에 나눠 담지 않고 그대로 보유합니다. 최대 20종목(각 5%)까지 채우면 총자산의 100%가 배분됩니다.</p>
 
                     <div class="warn">
                         <strong>주문 제외 조건:</strong> 현재가가 유효하지 않은(≤0) 종목만 제외하며, 배분 금액이 $1 미만인 극소액은 주문하지 않습니다(먼지 주문 방지). 소수점 금액 기반 매수라 최소 주문 수량 제한은 없습니다.
@@ -106,8 +110,9 @@
                     <h2>리스크 관리 규칙</h2>
                     <table>
                         <tr><th>규칙</th><th>값</th><th>설명</th></tr>
-                        <tr><td>최대 보유 종목</td><td><code>10개</code></td><td>분산 투자 한도</td></tr>
-                        <tr><td>종목당 최대 비율</td><td><code>10%</code></td><td>단일 종목 쏠림 방지</td></tr>
+                        <tr><td>최대 보유 종목</td><td><code>20개</code></td><td>분산 투자 한도</td></tr>
+                        <tr><td>종목당 비중</td><td><code>5%</code></td><td>총자산 대비 고정 비중(단일 종목 쏠림 방지)</td></tr>
+                        <tr><td>미배분 현금</td><td><code>보유</code></td><td>남은 현금은 재분배(reflow)하지 않고 대기 자금으로 유지</td></tr>
                         <tr><td>손절 기준</td><td><code>-7%</code></td><td>최대 손실 한도</td></tr>
                         <tr><td>익절 기준</td><td><code>+20%</code></td><td>목표 수익률</td></tr>
                         <tr><td>매수 신호 점수</td><td><code>120점</code></td><td>CANSLIM(100) + C&H(90) 중 120 이상</td></tr>

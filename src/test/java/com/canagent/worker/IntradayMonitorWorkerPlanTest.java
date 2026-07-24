@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("매수 계획(planPurchases) notional 순수 로직 단위테스트")
+@DisplayName("매수 계획(planPurchases) notional 순수 로직 단위테스트 — 총자산 기준 상한·잔여 미배분(dry powder)")
 class IntradayMonitorWorkerPlanTest {
 
     private Map<String, PlanResult> byCode(List<PlanResult> results) {
@@ -28,27 +28,34 @@ class IntradayMonitorWorkerPlanTest {
         return new PlanInput(code, new BigDecimal(price), score);
     }
 
+    // 새 시그니처: planPurchases(signals, totalEquity, availableCash, availableSlots, positionRate)
+    // perPositionCap = totalEquity × positionRate/100, 실제 배분 = min(perPositionCap, 잔여 가용현금).
+
     @Test
-    @DisplayName("notional: 고가 종목도 소수 매수 가능 — 1주 초과 개념 없음(UNAFFORDABLE 소멸)")
+    @DisplayName("notional: 고가 종목도 소수 매수 가능 — 종목당 상한 이내 배분")
     void highPriceStock_isBoughtFractionally() {
         List<PlanInput> signals = List.of(
-                in("000660", "2263000", 141), // 예전엔 1주>예수금이라 UNAFFORDABLE
+                in("000660", "2263000", 141),
                 in("126640", "3600", 154),
                 in("001200", "4215", 144)
         );
 
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, new BigDecimal("1000000"), 10, 10);
+        // 총자산=가용현금=100만, positionRate=5 → 종목당 상한 5만
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(
+                signals, new BigDecimal("1000000"), new BigDecimal("1000000"), 10, 5);
         Map<String, PlanResult> m = byCode(plan);
 
-        // 소수 매수라 고가주도 배분금액을 받는다(BUY)
         assertThat(m.get("000660").status()).isEqualTo(PlanStatus.BUY);
         assertThat(m.get("000660").orderAmount()).isGreaterThan(BigDecimal.ZERO);
         assertThat(m.get("126640").status()).isEqualTo(PlanStatus.BUY);
         assertThat(m.get("001200").status()).isEqualTo(PlanStatus.BUY);
+        // 각 종목 배분은 종목당 상한(5만) 이내
+        assertThat(m.get("000660").orderAmount()).isLessThanOrEqualTo(new BigDecimal("50000"));
+        assertThat(m.get("126640").orderAmount()).isLessThanOrEqualTo(new BigDecimal("50000"));
     }
 
     @Test
-    @DisplayName("총 배분금액은 예수금을 절대 초과하지 않는다")
+    @DisplayName("총 배분금액은 가용현금을 절대 초과하지 않는다")
     void neverExceedsAvailableCash() {
         List<PlanInput> signals = List.of(
                 in("A", "3600", 150),
@@ -58,7 +65,7 @@ class IntradayMonitorWorkerPlanTest {
                 in("E", "41750", 138)
         );
         BigDecimal cash = new BigDecimal("1000000");
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, 10, 10);
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 10, 5);
         assertThat(totalAmount(plan)).isLessThanOrEqualTo(cash);
     }
 
@@ -70,7 +77,8 @@ class IntradayMonitorWorkerPlanTest {
                 in("MID", "5000", 150),
                 in("LO", "5000", 140)
         );
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, new BigDecimal("1000000"), 2, 10);
+        BigDecimal cash = new BigDecimal("1000000");
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 2, 5);
         Map<String, PlanResult> m = byCode(plan);
 
         assertThat(m.get("HI").status()).isEqualTo(PlanStatus.BUY);
@@ -79,8 +87,8 @@ class IntradayMonitorWorkerPlanTest {
     }
 
     @Test
-    @DisplayName("분산: 여러 종목에 걸쳐 배분되고 잔여현금이 이월되어 예수금 대부분 소진")
-    void diversifiesAndReflowsLeftover() {
+    @DisplayName("상한만 배분하고 잔여 현금은 미배분(dry powder)로 보유 — reflow 제거")
+    void capsPerPositionAndKeepsLeftoverAsDryPowder() {
         List<PlanInput> signals = List.of(
                 in("A", "3600", 150),
                 in("B", "9450", 148),
@@ -88,13 +96,20 @@ class IntradayMonitorWorkerPlanTest {
                 in("D", "143500", 142)
         );
         BigDecimal cash = new BigDecimal("1000000");
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, 10, 10);
+        // positionRate=5 → 종목당 상한 5만. 4종목 × 5만 = 20만만 배분, 80만은 미배분.
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 10, 5);
 
         long bought = plan.stream().filter(r -> r.status() == PlanStatus.BUY).count();
         assertThat(bought).isEqualTo(4); // 4종목 모두 배분(분산)
-        // 이월로 예수금 대부분 소진(잔돈만 남음)
-        assertThat(totalAmount(plan)).isLessThanOrEqualTo(cash);
-        assertThat(totalAmount(plan)).isGreaterThan(cash.subtract(new BigDecimal("1")));
+
+        // 각 종목 정확히 상한(5만)만 배분
+        Map<String, PlanResult> m = byCode(plan);
+        assertThat(m.get("A").orderAmount()).isEqualByComparingTo(new BigDecimal("50000"));
+        assertThat(m.get("D").orderAmount()).isEqualByComparingTo(new BigDecimal("50000"));
+
+        // 총 배분 = 20만, 잔여 80만은 미배분(dry powder)
+        assertThat(totalAmount(plan)).isEqualByComparingTo(new BigDecimal("200000"));
+        assertThat(totalAmount(plan)).isLessThan(cash); // 잔여 현금 존재
     }
 
     @Test
@@ -104,7 +119,8 @@ class IntradayMonitorWorkerPlanTest {
                 in("A", "3600", 150),
                 in("B", "9580", 144)
         );
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, new BigDecimal("1000000"), 0, 10);
+        BigDecimal cash = new BigDecimal("1000000");
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 0, 5);
         assertThat(plan).allMatch(r -> r.status() == PlanStatus.LIMIT_REACHED);
         assertThat(totalAmount(plan)).isEqualByComparingTo(BigDecimal.ZERO);
     }
@@ -117,25 +133,27 @@ class IntradayMonitorWorkerPlanTest {
                 in("NEG", "-100", 190),
                 in("OK", "3600", 150)
         );
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, new BigDecimal("1000000"), 10, 10);
+        BigDecimal cash = new BigDecimal("1000000");
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 10, 5);
         Map<String, PlanResult> m = byCode(plan);
         assertThat(m.get("BAD").status()).isEqualTo(PlanStatus.MIN_AMOUNT);
         assertThat(m.get("NEG").status()).isEqualTo(PlanStatus.MIN_AMOUNT);
         assertThat(m.get("OK").status()).isEqualTo(PlanStatus.BUY);
-        assertThat(totalAmount(plan)).isLessThanOrEqualTo(new BigDecimal("1000000"));
+        assertThat(totalAmount(plan)).isLessThanOrEqualTo(cash);
     }
 
     @Test
-    @DisplayName("positionRate 0이어도 이월(잔여 소진)로 배분은 진행")
-    void zeroPositionRate_stillAllocatesViaReflow() {
+    @DisplayName("positionRate 0이면 종목당 상한 0 → 배분 0(MIN_AMOUNT), 현금 전액 보유")
+    void zeroPositionRate_allocatesNothing() {
         List<PlanInput> signals = List.of(in("A", "3600", 150));
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, new BigDecimal("100000"), 10, 0);
-        assertThat(byCode(plan).get("A").status()).isEqualTo(PlanStatus.BUY);
-        assertThat(totalAmount(plan)).isLessThanOrEqualTo(new BigDecimal("100000"));
+        BigDecimal cash = new BigDecimal("100000");
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 10, 0);
+        assertThat(byCode(plan).get("A").status()).isEqualTo(PlanStatus.MIN_AMOUNT);
+        assertThat(totalAmount(plan)).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
-    @DisplayName("사용자 시나리오: 예수금 100만원 혼합 종목 — 전부 소수 매수(분산)")
+    @DisplayName("사용자 시나리오: 총자산 100만원 혼합 종목 — 종목당 상한(5%=5만)까지만 배분, 잔여 보유")
     void userScenario_oneMillionCash() {
         List<PlanInput> signals = List.of(
                 in("126640", "3600", 154),
@@ -148,11 +166,56 @@ class IntradayMonitorWorkerPlanTest {
                 in("402340", "1380000", 144)
         );
         BigDecimal cash = new BigDecimal("1000000");
-        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, 10, 10);
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 20, 5);
 
-        // 소수 매수라 고가주도 배분됨(예전 UNAFFORDABLE이 사라짐)
         long bought = plan.stream().filter(r -> r.status() == PlanStatus.BUY).count();
         assertThat(bought).isEqualTo(8);
-        assertThat(totalAmount(plan)).isLessThanOrEqualTo(cash);
+        // 8종목 × 5만 상한 = 40만 배분, 60만 미배분(dry powder)
+        assertThat(totalAmount(plan)).isEqualByComparingTo(new BigDecimal("400000"));
+        assertThat(totalAmount(plan)).isLessThan(cash);
+    }
+
+    @Test
+    @DisplayName("첫날 버그 재발 방지: 2신호·소액 시드(총자산 10만·현금 10만·rate 5) → 각 5%(5천)만 배분, 나머지 9만 미배분")
+    void smallSeedTwoSignals_capsAtFivePercentEach_keepsRest() {
+        List<PlanInput> signals = List.of(
+                in("SIG1", "3600", 150),
+                in("SIG2", "4215", 148)
+        );
+        BigDecimal cash = new BigDecimal("100000");
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, cash, cash, 20, 5);
+        Map<String, PlanResult> m = byCode(plan);
+
+        // 각 종목 정확히 5% = 5,000만 배분 (50/50 전액소진 아님)
+        assertThat(m.get("SIG1").status()).isEqualTo(PlanStatus.BUY);
+        assertThat(m.get("SIG1").orderAmount()).isEqualByComparingTo(new BigDecimal("5000"));
+        assertThat(m.get("SIG2").status()).isEqualTo(PlanStatus.BUY);
+        assertThat(m.get("SIG2").orderAmount()).isEqualByComparingTo(new BigDecimal("5000"));
+
+        // 총 1만 배분, 9만은 미배분(현금 보유) — 다음 신호가 매수 가능
+        assertThat(totalAmount(plan)).isEqualByComparingTo(new BigDecimal("10000"));
+    }
+
+    @Test
+    @DisplayName("총자산 > 가용현금(기존 보유 존재): 상한은 총자산 기준, 배분은 현금 한도 내")
+    void capUsesEquityButAllocationBoundedByCash() {
+        List<PlanInput> signals = List.of(
+                in("A", "3600", 150),
+                in("B", "4215", 148)
+        );
+        // 총자산 100만(보유평가 포함)이지만 가용현금은 3만뿐.
+        // 종목당 상한 = 100만 × 5% = 5만. 그러나 현금 3만이 한도.
+        BigDecimal equity = new BigDecimal("1000000");
+        BigDecimal cash = new BigDecimal("30000");
+        List<PlanResult> plan = IntradayMonitorWorker.planPurchases(signals, equity, cash, 20, 5);
+        Map<String, PlanResult> m = byCode(plan);
+
+        // A는 상한 5만 원하지만 현금 3만이 한도 → 3만 배분(min).
+        assertThat(m.get("A").status()).isEqualTo(PlanStatus.BUY);
+        assertThat(m.get("A").orderAmount()).isEqualByComparingTo(new BigDecimal("30000"));
+        // B는 현금 소진 후 배분 0 → MIN_AMOUNT.
+        assertThat(m.get("B").status()).isEqualTo(PlanStatus.MIN_AMOUNT);
+        // 총 배분은 가용현금(3만) 초과 안 함.
+        assertThat(totalAmount(plan)).isEqualByComparingTo(new BigDecimal("30000"));
     }
 }

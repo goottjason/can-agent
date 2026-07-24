@@ -57,10 +57,10 @@ public class IntradayMonitorWorker {
     private final MarketHours marketHours;
     private final StockPriceUpserter stockPriceUpserter;
 
-    @Value("${trading.max-positions:10}")
+    @Value("${trading.max-positions:20}")
     private int maxPositions;
 
-    @Value("${trading.position-rate:10}")
+    @Value("${trading.position-rate:5}")
     private int positionRate;
 
     @Value("${trading.min-score:120}")
@@ -116,7 +116,7 @@ public class IntradayMonitorWorker {
 
         CheckFunnel funnel = new CheckFunnel(minScore);
         try {
-            // 1단계: 보유 종목 매도 체크 (≤10개, ~5초)
+            // 1단계: 보유 종목 매도 체크 (≤20개, ~10초)
             checkHeldPositionsForSell(now);
 
             // 2단계: 매수 대상 스캔 (~400종목)
@@ -416,15 +416,16 @@ public class IntradayMonitorWorker {
             return;
         }
 
-        // P6(§3): notional 매수 계획(순수 로직). 예수금 필터 → 점수순 슬롯 선정 → 종목당 상한(positionRate%)
-        // → 잔여 이월. 소수 매수(orderAmount)이므로 정수 FLOOR·최소주문 정수주 로직 제거.
+        // 분산 사이징: 종목당 상한 = 총자산(현금+보유평가) × positionRate%. 실제 배분 = min(상한, 잔여 가용현금).
+        // 잔여 현금은 미배분(dry powder)로 남긴다(reflow 제거) — 소액 시드 전액소진·이후 매수차단 방지.
+        BigDecimal totalEquity = balance.totalEval();
         Map<String, SignalStock> byCode = new LinkedHashMap<>();
         List<PlanInput> inputs = new ArrayList<>();
         for (SignalStock s : signalStocks) {
             byCode.put(s.stock.getCode(), s);
             inputs.add(new PlanInput(s.stock.getCode(), s.currentPrice, s.totalScore.intValue()));
         }
-        List<PlanResult> plan = planPurchases(inputs, availableCash, availableSlots, positionRate);
+        List<PlanResult> plan = planPurchases(inputs, totalEquity, availableCash, availableSlots, positionRate);
 
         for (PlanResult pr : plan) {
             SignalStock signal = byCode.get(pr.code());
@@ -491,12 +492,15 @@ public class IntradayMonitorWorker {
      * notional(금액기반) 분산 매수 계획을 수립한다(부작용 없음). 소수 매수이므로 정수 주·최소주문 정수 로직 없음.
      * 1) 유효성 필터: 현재가 ≤0은 MIN_AMOUNT(0으로 나눔 방지 — 소수 수량 환산 불가),
      * 2) 점수 desc 정렬 후 가용 슬롯만큼 선정(초과분 LIMIT_REACHED),
-     * 3) 종목당 상한 = 예수금 × positionRate%(분산: 10% 기본)까지 점수순으로 금액 배분,
-     * 4) 잔여현금을 점수순으로 균등 이월(상한 무시, 남은 현금 소진) — 분산(다양성) 우선,
+     * 3) 종목당 상한 = 총자산(현금+보유평가) × positionRate% → 배분 = min(상한, 잔여 가용현금),
+     * 4) 잔여현금은 미배분(dry powder)로 보유 — reflow 제거(소액 시드 전액소진·이후 매수차단 방지),
      * 5) 배분금액이 {@link #MIN_ORDER_AMOUNT} 미만이면 MIN_AMOUNT.
+     *
+     * @param totalEquity   총자산(현금+보유평가). 종목당 상한 계산 기준.
+     * @param availableCash 주문 가능 현금. 실제 배분 총합의 상한(현금 이상 배분 금지).
      */
-    static List<PlanResult> planPurchases(List<PlanInput> signals, BigDecimal availableCash,
-                                          int availableSlots, int positionRate) {
+    static List<PlanResult> planPurchases(List<PlanInput> signals, BigDecimal totalEquity,
+                                          BigDecimal availableCash, int availableSlots, int positionRate) {
         List<PlanResult> results = new ArrayList<>();
         if (availableSlots <= 0) {
             for (PlanInput s : signals) {
@@ -527,8 +531,9 @@ public class IntradayMonitorWorker {
             return results;
         }
 
-        // 3) 종목당 상한(positionRate%) — 점수순 금액 배분. 상한 최소 방어는 두지 않고, 부족분은 이월이 채운다.
-        BigDecimal perPositionCap = availableCash
+        // 3) 종목당 상한 = 총자산 × positionRate% → 점수순으로 min(상한, 잔여현금) 배분.
+        //    잔여현금이 상한보다 적으면 현금 한도가 우선(현금 이상 배분 금지).
+        BigDecimal perPositionCap = totalEquity
                 .multiply(BigDecimal.valueOf(positionRate))
                 .divide(new BigDecimal("100"), 2, RoundingMode.FLOOR);
         Map<String, BigDecimal> amount = new LinkedHashMap<>();
@@ -541,21 +546,7 @@ public class IntradayMonitorWorker {
                 remaining = remaining.subtract(alloc);
             }
         }
-
-        // 4) 잔여현금 이월 — 점수순 종목에 균등 배분(소진). 소수 매수라 라운드로빈 없이 한 번에 나눈다.
-        if (remaining.signum() > 0) {
-            BigDecimal share = remaining.divide(BigDecimal.valueOf(selected.size()), 2, RoundingMode.FLOOR);
-            if (share.signum() > 0) {
-                for (PlanInput s : selected) {
-                    amount.merge(s.code(), share, BigDecimal::add);
-                    remaining = remaining.subtract(share);
-                }
-            }
-            // 나눔 나머지(잔돈)는 점수 최상위 종목에 몰아준다.
-            if (remaining.signum() > 0) {
-                amount.merge(selected.get(0).code(), remaining, BigDecimal::add);
-            }
-        }
+        // 4) 잔여현금(remaining)은 미배분(dry powder)로 보유 — reflow 없음.
 
         // 5) 결과화
         for (PlanInput s : selected) {

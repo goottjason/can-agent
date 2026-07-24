@@ -51,8 +51,8 @@ trading:
     sync-cron: "0 0 4 * * MON-FRI"         # 오전 4시 ET (주가·재무 동기화 — SEC 나이틀리 이후)
     quarterly-cron: "0 0 10 1 1,4,7,10 *"  # 분기 시작월 1일 오전 10시 ET (재무제표 동기화)
     monitor-cron: "0 */5 9-15 * * MON-FRI" # 장중 5분마다 (ET 정규장 09:30~16:00)
-  max-positions: 10
-  position-rate: 10
+  max-positions: 20
+  position-rate: 5
   stop-loss-rate: 7
   take-profit-rate: 20
   min-score: 120

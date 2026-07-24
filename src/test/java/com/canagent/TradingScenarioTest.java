@@ -137,9 +137,10 @@ class TradingScenarioTest {
     @Test
     @DisplayName("시나리오 3: 보유 종목이 최대치에 도달하면 매수하지 않는다")
     void scenario3_maxPositionsReached_noBuy() {
-        for (int i = 0; i < 10; i++) {
+        // 최대 보유 종목 수(trading.max-positions=20)만큼 채워 상한 도달 상황을 만든다.
+        for (int i = 0; i < 20; i++) {
             Stock stock = MockDataFactory.createStock(
-                    String.format("00000%d", i), "종목" + i, "KOSPI", "섹터");
+                    String.format("0000%02d", i), "종목" + i, "KOSPI", "섹터");
             stockRepository.save(stock);
 
             Portfolio portfolio = MockDataFactory.createPortfolio(stock, 10, new BigDecimal("50000"));

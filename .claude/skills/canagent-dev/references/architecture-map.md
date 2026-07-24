@@ -72,8 +72,8 @@
 |----|----------|------|------|
 | `trading.scheduler.enabled` | true | true | 워커 빈 생성 여부 (`@ConditionalOnProperty`) |
 | `trading.min-score` | 120 | 120 | 매수 최소 총점 |
-| `trading.max-positions` | 10 | 10 | 최대 보유 종목 |
-| `trading.position-rate` | 10 | 10 | 종목당 배분 % |
+| `trading.max-positions` | 20 | 20 | 최대 보유 종목 (분산) |
+| `trading.position-rate` | 5 | 5 | 종목당 상한 % — 총자산(현금+보유평가) 기준 |
 | `trading.real-trading` | false | `${REAL_TRADING:true}` | 실주문 여부 |
 | `trading.secret` | — | `${TRADE_SECRET:}` | `/trade/run` 헤더 인증 |
 | 한투 | — | `KOREA_INVESTMENT_APP_KEY/SECRET/ACCOUNT_NUMBER/IS_REAL` | 실전 `openapi.koreainvestment.com:9443` |
