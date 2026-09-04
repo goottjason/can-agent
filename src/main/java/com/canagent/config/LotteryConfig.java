@@ -15,9 +15,8 @@ public class LotteryConfig {
     private boolean dryRun = true;           // true면 구매 없이 로그인·잔액만
     private int balanceThreshold = 3000;     // 예치금 알림 임계(원)
     private List<String> sidecarCommand = new ArrayList<>();  // 예: [python3, /opt/canagent/sidecar/lottery/buy.py]
-    private int sidecarTimeoutSec = 120;
+    private int sidecarTimeoutSec = 600;   // 연금 재시도 3회 + 매회 원장 재조회(3회) 포함 — 최악 ~470s + 여유
     // 자동구매 대상 게임. 배포 시 서버 env(LOTTERY_GAMES=LOTTO645)로 로또만 제한 가능.
-    // 연금(WIN720)은 사이드카 Playwright 미구현이라 실구매 활성 전까지 제외 권장.
     private List<GameType> games = new ArrayList<>(List.of(GameType.LOTTO645, GameType.WIN720));
 
     public boolean isEnabled() { return enabled; }

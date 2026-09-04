@@ -88,9 +88,12 @@ lottery:
   balance-threshold: 3000
   # 컨테이너 내 venv 파이썬 + 사이드카 경로(콤마구분 → List). 예: /app/sidecar/lottery/.venv/bin/python,/app/sidecar/lottery/buy.py
   sidecar-command: ${LOTTERY_SIDECAR_CMD:}
-  sidecar-timeout-sec: 120
+  sidecar-timeout-sec: 600   # 연금 재시도 3회 + 매회 원장 재조회 시간 확보
   # 자동구매 대상(콤마구분). 연금(WIN720) 실구매 활성 전까지 서버 env로 LOTTERY_GAMES=LOTTO645 권장.
   games: ${LOTTERY_GAMES:LOTTO645,WIN720}
   buy-cron: "0 0 9 * * TUE"
+  # 미구매 게임만 다시 시도(멱등). 연금 판매마감(목 17시경) 전까지.
+  buy-retry-cron: "0 0 11,15 * * TUE,WED,THU"
+  buy-deadline-cron: "0 30 15 * * THU"      # 재시도 창 종료 후 결말 통보
   win720-result-cron: "0 0 22 * * THU"
   lotto-result-cron: "0 0 22 * * SAT"

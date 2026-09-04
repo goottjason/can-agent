@@ -11,6 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -82,12 +85,30 @@ public class PythonLotterySidecarAdapter implements LotterySidecarPort {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);  // stderr를 stdout에 병합 — 파이프 버퍼 데드락 방지
         Process process = pb.start();
-        String stdout = new String(process.getInputStream().readAllBytes());
+        // 출력은 별도 스레드로 읽는다. 같은 스레드에서 readAllBytes()를 하면 사이드카가 멎었을 때
+        // waitFor 타임아웃에 도달하지 못해 스케줄러 스레드(pool=3)가 영구 점유된다.
+        StringBuffer buf = new StringBuffer();
+        Thread reader = new Thread(() -> {
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = r.readLine()) != null) buf.append(line).append('\n');
+            } catch (Exception ignored) {
+                // 프로세스 강제 종료 시 스트림이 끊기는 것은 정상 — 타임아웃 경로에서 처리한다.
+            }
+        }, "lottery-sidecar-out");
+        reader.setDaemon(true);
+        reader.start();
+
         boolean done = process.waitFor(config.getSidecarTimeoutSec(), TimeUnit.SECONDS);
         if (!done) {
             process.destroyForcibly();
+            reader.join(2000);
+            log.error("사이드카 타임아웃 — 부분 출력: {}", buf.toString().strip());
             throw new IllegalStateException("사이드카 타임아웃(" + config.getSidecarTimeoutSec() + "s)");
         }
+        reader.join(5000);   // 종료 후 남은 출력 수거
+        String stdout = buf.toString();
         // 사이드카는 JSON을 마지막 줄에 출력한다(로그와 분리).
         String[] lines = stdout.strip().split("\\R");
         return lines[lines.length - 1];

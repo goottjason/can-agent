@@ -7,6 +7,9 @@ import com.canagent.port.dto.SidecarResults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -110,5 +113,40 @@ class PythonLotterySidecarAdapterTest {
 
         assertThat(r.ok()).isFalse();
         assertThat(r.errors()).isNotEmpty();
+    }
+
+    /** 멈춘 사이드카가 스케줄러 스레드를 영구 점유하지 않는지 — 출력 미종료 상태에서 타임아웃 강제. */
+    @Test
+    @Timeout(15)
+    @DisplayName("사이드카가 응답 없이 매달려도 타임아웃으로 회수하고 오류 결과를 반환한다")
+    void hangingSidecarTimesOut() {
+        LotteryConfig cfg = new LotteryConfig();
+        cfg.setSidecarCommand(List.of("sh", "-c", "sleep 30"));   // 출력 없이 매달림
+        cfg.setSidecarTimeoutSec(2);
+        PythonLotterySidecarAdapter a = new PythonLotterySidecarAdapter(cfg, new ObjectMapper());
+
+        long t0 = System.currentTimeMillis();
+        SidecarResult r = a.purchaseWeekly(List.of(GameType.WIN720));
+        long elapsed = System.currentTimeMillis() - t0;
+
+        assertThat(r.ok()).isFalse();
+        assertThat(r.errors()).anyMatch(e -> e.reason().contains("타임아웃"));
+        assertThat(elapsed).isLessThan(10_000);
+    }
+
+    @Test
+    @Timeout(15)
+    @DisplayName("마지막 줄 JSON만 계약으로 읽는다(앞선 로그 줄은 무시)")
+    void readsLastLineAsJson() {
+        LotteryConfig cfg = new LotteryConfig();
+        cfg.setSidecarCommand(List.of("sh", "-c",
+                "echo '[WIN720] 시도 1/3 실패'; echo '{\"ok\":true,\"balanceAfter\":4000,\"tickets\":[],\"errors\":[]}'"));
+        cfg.setSidecarTimeoutSec(10);
+        PythonLotterySidecarAdapter a = new PythonLotterySidecarAdapter(cfg, new ObjectMapper());
+
+        SidecarResult r = a.purchaseWeekly(List.of(GameType.WIN720));
+
+        assertThat(r.ok()).isTrue();
+        assertThat(r.balanceAfter()).isEqualTo(4000);
     }
 }

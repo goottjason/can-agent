@@ -119,6 +119,108 @@ class LotteryPurchaseServiceTest {
     }
 
     @Test
+    @DisplayName("재시도로 같은 실패가 반복돼도 실패 알림은 그 주 1회만 보낸다")
+    void suppressesDuplicateFailureAlertsWithinWeek() {
+        when(repo.existsByGameTypeAndPurchasedAtAfter(any(), any())).thenReturn(false);
+        LotterySidecarPort port = new FakeSidecar(new SidecarResult(true, 5000, List.of(),
+                List.of(new SidecarError("WIN720", "연금 구매 완료 미확인"))));
+        LotteryPurchaseService svc = new LotteryPurchaseService(port, repo, router, config, clock);
+
+        svc.buyWeekly();   // 화 09:00 최초
+        svc.buyWeekly();   // 화 11:00 재시도
+        svc.buyWeekly();   // 화 15:00 재시도
+
+        assertThat(messages.stream().filter(m -> m.contains("복권 구매 실패")).count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("사유가 달라지면 같은 주 재시도에서도 새 실패 알림을 보낸다")
+    void alertsAgainWhenReasonChanges() {
+        when(repo.existsByGameTypeAndPurchasedAtAfter(any(), any())).thenReturn(false);
+        // 호출마다 다른 사유를 반환하는 Fake — 하나의 서비스 인스턴스에서 억제 키가 달라짐을 검증
+        LotterySidecarPort port = new LotterySidecarPort() {
+            private int n = 0;
+            @Override public SidecarResult purchaseWeekly(List<GameType> games) {
+                String reason = (n++ == 0) ? "완료 미확인" : "예치금 부족";
+                return new SidecarResult(true, 5000, List.of(),
+                        List.of(new SidecarError("WIN720", reason)));
+            }
+            @Override public int getBalance() { throw new UnsupportedOperationException(); }
+            @Override public com.canagent.port.dto.SidecarResults checkResults() { throw new UnsupportedOperationException(); }
+        };
+        LotteryPurchaseService svc = new LotteryPurchaseService(port, repo, router, config, clock);
+
+        svc.buyWeekly();
+        svc.buyWeekly();
+
+        assertThat(messages.stream().filter(m -> m.contains("복권 구매 실패")).count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("예치금 부족 알림도 재시도 반복 시 그 주 1회만 보낸다")
+    void suppressesDuplicateLowBalanceAlerts() {
+        when(repo.existsByGameTypeAndPurchasedAtAfter(any(), any())).thenReturn(false);
+        LotterySidecarPort port = new FakeSidecar(new SidecarResult(true, 500, List.of(),
+                List.of()));
+        LotteryPurchaseService svc = new LotteryPurchaseService(port, repo, router, config, clock);
+
+        svc.buyWeekly();
+        svc.buyWeekly();
+
+        assertThat(messages.stream().filter(m -> m.contains("예치금 부족")).count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("사유 뒤 가변 문구가 달라져도 같은 성격의 실패는 1회만 알린다")
+    void suppressesWhenOnlyVariableTailDiffers() {
+        when(repo.existsByGameTypeAndPurchasedAtAfter(any(), any())).thenReturn(false);
+        LotterySidecarPort port = new LotterySidecarPort() {
+            private int n = 0;
+            @Override public SidecarResult purchaseWeekly(List<GameType> games) {
+                // 같은 실패지만 뒤에 붙는 페이지 본문이 매번 다르다
+                String reason = "연금 구매 3회 시도 모두 실패: 완료 미확인 " + (n++);
+                return new SidecarResult(true, 5000, List.of(),
+                        List.of(new SidecarError("WIN720", reason)));
+            }
+            @Override public int getBalance() { throw new UnsupportedOperationException(); }
+            @Override public com.canagent.port.dto.SidecarResults checkResults() { throw new UnsupportedOperationException(); }
+        };
+        LotteryPurchaseService svc = new LotteryPurchaseService(port, repo, router, config, clock);
+
+        svc.buyWeekly();
+        svc.buyWeekly();
+        svc.buyWeekly();
+
+        assertThat(messages.stream().filter(m -> m.contains("복권 구매 실패")).count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("재시도 창 종료 후 미구매 게임이 남으면 최종 실패를 통보한다")
+    void reportsUnpurchasedAtDeadline() {
+        when(repo.existsByGameTypeAndPurchasedAtAfter(eq(GameType.LOTTO645), any())).thenReturn(true);
+        when(repo.existsByGameTypeAndPurchasedAtAfter(eq(GameType.WIN720), any())).thenReturn(false);
+        LotteryPurchaseService svc = new LotteryPurchaseService(
+                new TrackingSidecar(), repo, router, config, clock);
+
+        svc.reportUnpurchased();
+
+        assertThat(messages).anyMatch(m -> m.contains("최종 실패") && m.contains("WIN720"));
+        assertThat(messages).noneMatch(m -> m.contains("LOTTO645"));
+    }
+
+    @Test
+    @DisplayName("모두 구매됐으면 최종 통보를 보내지 않는다")
+    void silentAtDeadlineWhenAllPurchased() {
+        when(repo.existsByGameTypeAndPurchasedAtAfter(any(), any())).thenReturn(true);
+        LotteryPurchaseService svc = new LotteryPurchaseService(
+                new TrackingSidecar(), repo, router, config, clock);
+
+        svc.reportUnpurchased();
+
+        assertThat(messages).isEmpty();
+    }
+
+    @Test
     @DisplayName("games 설정이 로또만이면 로또만 사이드카에 요청한다")
     void restrictsToConfiguredGames() {
         config.setGames(List.of(GameType.LOTTO645));

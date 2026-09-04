@@ -19,7 +19,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class LotteryPurchaseService {
@@ -33,6 +35,10 @@ public class LotteryPurchaseService {
     private final LotteryConfig config;
     private final Clock clock;
 
+    // 주간 재시도(buy-retry-cron)로 같은 실패 알림이 반복되지 않도록 주 단위로 중복을 억제한다.
+    private LocalDateTime notifiedWeekStart;
+    private final Set<String> notifiedKeys = new HashSet<>();
+
     public LotteryPurchaseService(LotterySidecarPort port, LotteryTicketRepository repository,
                                   NotificationServiceRouter router, LotteryConfig config, Clock clock) {
         this.port = port;
@@ -42,10 +48,12 @@ public class LotteryPurchaseService {
         this.clock = clock;
     }
 
-    public void buyWeekly() {
+    /** 이번 주 미구매 게임만 구매한다. 재시도 크론이 반복 호출해도 안전한 멱등 연산. */
+    public synchronized void buyWeekly() {
         ZonedDateTime nowKst = ZonedDateTime.now(clock).withZoneSameInstant(KST);
         LocalDateTime weekStart = nowKst.toLocalDate()
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
+        resetNotificationsOnNewWeek(weekStart);
 
         // 설정된 게임(lottery.games)만 대상. 배포 시 LOTTERY_GAMES=LOTTO645로 연금 제외 가능.
         List<GameType> pending = config.getGames().stream()
@@ -69,11 +77,62 @@ public class LotteryPurchaseService {
             router.sendText(formatPurchase(result));
         }
         for (SidecarError e : result.errors()) {
-            router.sendText("❌ 복권 구매 실패: " + e.gameType() + " — " + e.reason());
+            notifyOnce(failureKey(e),
+                    "❌ 복권 구매 실패: " + e.gameType() + " — " + e.reason()
+                            + "\n(판매마감 전까지 자동 재시도 — 동일 사유 반복 알림은 생략합니다)");
         }
         if (result.balanceAfter() < config.getBalanceThreshold()) {
-            router.sendText("⚠️ 예치금 부족: 현재 " + result.balanceAfter() + "원 (임계 "
+            notifyOnce("BALANCE", "⚠️ 예치금 부족: 현재 " + result.balanceAfter() + "원 (임계 "
                     + config.getBalanceThreshold() + "원). 충전이 필요합니다.");
+        }
+    }
+
+    /**
+     * 재시도 창이 끝난 뒤 남은 미구매 게임을 최종 통보한다.
+     * 실패 알림이 주 1회로 억제되므로, 결말(샀는지 못 샀는지)은 여기서 확실히 알린다.
+     */
+    public synchronized void reportUnpurchased() {
+        ZonedDateTime nowKst = ZonedDateTime.now(clock).withZoneSameInstant(KST);
+        LocalDateTime weekStart = nowKst.toLocalDate()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
+
+        List<GameType> missing = config.getGames().stream()
+                .filter(g -> !repository.existsByGameTypeAndPurchasedAtAfter(g, weekStart))
+                .toList();
+
+        if (missing.isEmpty()) {
+            log.info("이번 주 복권 구매 완료 — 최종 통보 없음");
+            return;
+        }
+        log.warn("이번 주 복권 최종 미구매: {}", missing);
+        router.sendText("🚨 이번 주 복권 구매 최종 실패: " + missing
+                + "\n자동 재시도를 모두 소진했습니다. 수동 구매 또는 예치금 확인이 필요합니다.");
+    }
+
+    /** 주가 바뀌면 알림 중복 억제 상태를 초기화한다(새 주에는 같은 사유도 다시 알린다). */
+    private void resetNotificationsOnNewWeek(LocalDateTime weekStart) {
+        if (!weekStart.equals(notifiedWeekStart)) {
+            notifiedWeekStart = weekStart;
+            notifiedKeys.clear();
+        }
+    }
+
+    /**
+     * 실패 알림 억제 키. 사유 원문에는 페이지 본문 같은 가변 문구가 섞이므로
+     * ':' 또는 '(' 앞의 고정 머리말만 사용해 같은 성격의 실패를 한 건으로 묶는다.
+     */
+    private String failureKey(SidecarError e) {
+        String head = e.reason() == null ? "" : e.reason().split("[:(]", 2)[0].strip();
+        if (head.length() > 40) head = head.substring(0, 40);
+        return "ERR|" + e.gameType() + "|" + head;
+    }
+
+    /** 같은 주에 같은 키의 알림은 1회만 발송한다. */
+    private void notifyOnce(String key, String message) {
+        if (notifiedKeys.add(key)) {
+            router.sendText(message);
+        } else {
+            log.info("복권 알림 중복 억제(이번 주 발송됨): {}", key);
         }
     }
 
