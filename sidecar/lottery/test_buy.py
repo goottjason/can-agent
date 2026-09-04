@@ -29,6 +29,44 @@ class TestHardStopReason:
         assert buy._hard_stop_reason(["정상 안내", "예치금 부족"]) == "예치금 부족"
 
 
+class TestNumberLevelIsRetryable:
+    """번호 단위 사유는 '다른 번호로 다시'가 정답 — 하드스톱으로 오분류되면 재시도가 죽는다."""
+
+    @pytest.mark.parametrize("msg", [
+        "이미 판매된 번호입니다.",
+        "판매 마감된 번호입니다. 다른 번호를 선택해 주세요.",
+        "선택하신 번호는 구매할 수 없습니다.",
+        "해당 번호는 잔여 수량이 부족합니다.",
+        "매진된 번호입니다.",
+    ])
+    def test_number_level_never_hard_stops(self, msg):
+        assert buy._retry_hint([msg]) == msg
+        assert buy._hard_stop_reason([msg]) is None     # '마감'·'부족'이 들어 있어도 재시도한다
+
+    @pytest.mark.parametrize("msg", ["구매 제한 안내", "중복 선택되었습니다", "판매 마감까지 남은시간"])
+    def test_bare_keywords_no_longer_hard_stop(self, msg):
+        """단어 하나('마감'·'제한'·'중복')로 재시도를 끊지 않는다 — 정상/번호 안내와 겹친다."""
+        assert buy._hard_stop_reason([msg]) is None
+
+    def test_retry_hint_wins_over_hard_stop_in_same_batch(self):
+        msgs = ["예치금이 부족합니다.", "이미 판매된 번호입니다."]
+        assert buy._hard_stop_reason(msgs) is None
+
+    @pytest.mark.parametrize("msg", [
+        "구매한도 초과로 구매하실 수 없습니다.",
+        "예치금이 부족하여 구매할 수 없습니다.",
+    ])
+    def test_generic_negation_does_not_mask_account_reason(self, msg):
+        """범용 부정("구매할 수 없")은 계정 사유의 꼬리일 수 있다 — 헛된 8분 재시도를 막는다."""
+        assert buy._retry_hint([msg]) is None
+        assert buy._hard_stop_reason([msg]) == msg
+
+    def test_generic_negation_alone_is_retryable(self):
+        msg = "선택하신 번호는 구매할 수 없습니다."
+        assert buy._retry_hint([msg]) == msg
+        assert buy._hard_stop_reason([msg]) is None
+
+
 class TestWin720Ticket:
     def test_splits_buy_no_into_jo_and_digits(self):
         assert buy._win720_ticket("330", "4481478") == {
@@ -216,3 +254,93 @@ class _FakeFrame:
 
     def inner_text(self, sel):
         return self._body
+
+
+class _Win720Page:
+    """연금 게임 페이지 스텁 — 조 선택 → 자동번호 → 선택완료 흐름만 흉내낸다."""
+
+    def __init__(self, frame):
+        self._frame = frame
+        self.waits = []
+
+    def goto(self, url, **kw):
+        pass
+
+    def wait_for_timeout(self, ms):
+        self.waits.append(ms)
+
+    def frame(self, name=None):
+        return self._frame
+
+
+class _Win720Frame:
+    def __init__(self, ok_jo, dialogs, reject_msg=None, body="구매가 완료되었습니다"):
+        self.ok_jo = ok_jo          # 이 조에서만 번호가 확정된다(나머지는 소진)
+        self.dialogs = dialogs
+        self.reject_msg = reject_msg
+        self.body = body
+        self.tried = []
+        self._cur = None
+        self._buyno = self._rnd = ""
+
+    def query_selector_all(self, sel):
+        return []
+
+    def click(self, sel):
+        if "jogroup.num" in sel:
+            self._cur = sel[-1]
+            self.tried.append(self._cur)
+        elif "confirm_number" in sel:
+            if self._cur == self.ok_jo:
+                self._buyno, self._rnd = self._cur + "123456", "331"
+            else:
+                self._buyno = self._rnd = ""
+                if self.reject_msg:
+                    self.dialogs.append(self.reject_msg)
+
+    def evaluate(self, js):
+        if "BUY_NO" in js:
+            return self._buyno
+        if "DROUND" in js:
+            return self._rnd
+        return ""
+
+    def inner_text(self, sel):
+        return self.body
+
+
+class TestNumberRepick:
+    """소진된 번호를 만나면 브라우저를 다시 띄우지 않고 같은 페이지에서 다른 조로 다시 고른다."""
+
+    def test_repicks_until_a_jo_confirms(self):
+        dialogs = []
+        fr = _Win720Frame(ok_jo="3", dialogs=dialogs, reject_msg="이미 판매된 번호입니다.")
+        page = _Win720Page(fr)
+
+        rnd, buyno = buy._win720_interaction(page, ["1", "2", "3"], dialogs)
+
+        assert (rnd, buyno) == (331, "3123456")
+        assert fr.tried == ["1", "2", "3"]          # 조를 바꿔가며 재선택했다
+
+    def test_stops_repicking_on_account_level_reason(self):
+        dialogs = []
+        fr = _Win720Frame(ok_jo="9", dialogs=dialogs, reject_msg="예치금이 부족합니다.")
+        page = _Win720Page(fr)
+
+        with pytest.raises(buy.Win720Error) as ei:
+            buy._win720_interaction(page, ["1", "2", "3"], dialogs)
+
+        assert ei.value.hard_stop is True
+        assert fr.tried == ["1"]                    # 조를 바꿔도 소용없으므로 즉시 중단
+
+    def test_reports_tried_jo_when_all_exhausted(self):
+        dialogs = []
+        fr = _Win720Frame(ok_jo="9", dialogs=dialogs, reject_msg="이미 판매된 번호입니다.")
+        page = _Win720Page(fr)
+
+        with pytest.raises(buy.Win720Error) as ei:
+            buy._win720_interaction(page, ["1", "2", "3"], dialogs)
+
+        assert ei.value.hard_stop is False           # 다음 시도에서 다시 해볼 가치가 있다
+        assert "시도한 조" in str(ei.value)
+        assert fr.tried == ["1", "2", "3"]

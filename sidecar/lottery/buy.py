@@ -96,18 +96,55 @@ def _session_cookies(client):
     return out
 
 
-# 재시도해도 결과가 같고 중복구매만 유발하는 사유(하드스톱). 감지 시 즉시 중단한다.
-_WIN720_HARD_STOP = ("부족", "한도", "마감", "종료", "점검", "제한", "중복", "본인확인")
+# 번호 단위 사유 — 그 번호만 못 사는 것이므로 "다른 번호로" 다시 사면 된다.
+# 연금복권720+는 조·번호별 발행량이 한정돼 있어 자동으로 뽑힌 번호가 이미 소진됐을 수 있다.
+# 하드스톱 판정보다 **우선**한다 — "판매 마감된 번호입니다"의 '마감'이 회차 마감으로
+# 오분류되면 정작 필요한 재시도가 죽는다.
+# 번호를 못 산다고 못박는 표현 — 계정 사유와 겹칠 일이 없어 언제나 재시도로 본다.
+_WIN720_RETRY_SPECIFIC = (
+    "이미 판매", "판매된", "판매완료", "판매 완료", "매진", "소진", "수량",
+    "다른 번호", "번호를 다시", "재선택",
+)
+# 범용 부정 — "구매한도 초과로 구매하실 수 없습니다"처럼 계정 사유의 꼬리일 수 있다.
+# 하드스톱 단어가 같이 없을 때만 번호 사유로 본다.
+_WIN720_RETRY_GENERIC = ("선택할 수 없", "구매할 수 없", "구매하실 수 없")
+
+# 계정·회차 단위 사유 — 다시 사도 같은 결과라 중단한다(중복구매만 유발).
+# 단어 하나가 아니라 구절로 좁혀 잡는다("마감"·"제한"·"중복" 단독은 번호 안내와 겹친다).
+_WIN720_HARD_STOP = (
+    "부족", "한도", "점검", "본인확인", "정지",
+    "판매가 마감", "판매 마감되", "판매마감되", "판매가 종료", "판매 종료", "회차가 종료",
+)
 _WIN720_DEFAULT_ATTEMPTS = 3
 _WIN720_BACKOFF_SEC = (5, 15, 30)      # attempt 1,2,3 실패 후 대기
+_WIN720_JO_PICKS = 3                   # 한 페이지에서 조를 바꿔가며 번호를 다시 고르는 횟수
+
+
+def _match(texts, keys):
+    """keys 중 하나를 담은 첫 텍스트를 반환(없으면 None)."""
+    for t in texts:
+        if t and any(k in t for k in keys):
+            return t
+    return None
+
+
+def _retry_hint(texts):
+    """"다른 번호면 살 수 있다"는 안내가 담긴 첫 텍스트를 반환(없으면 None)."""
+    hit = _match(texts, _WIN720_RETRY_SPECIFIC)
+    if hit:
+        return hit
+    if _match(texts, _WIN720_HARD_STOP):   # 계정·회차 사유가 함께 있으면 번호 사유가 아니다
+        return None
+    return _match(texts, _WIN720_RETRY_GENERIC)
 
 
 def _hard_stop_reason(texts):
-    """재시도 무의미 사유가 담긴 첫 텍스트를 반환(없으면 None)."""
-    for t in texts:
-        if t and any(k in t for k in _WIN720_HARD_STOP):
-            return t
-    return None
+    """재시도 무의미 사유가 담긴 첫 텍스트를 반환(없으면 None).
+
+    번호 단위 안내가 하나라도 섞여 있으면 하드스톱이 아니다 — 다른 번호로 다시 사면 된다."""
+    if _retry_hint(texts):
+        return None
+    return _match(texts, _WIN720_HARD_STOP)
 
 
 class Win720Error(Exception):
@@ -179,7 +216,8 @@ def _win720_attempt(client):
     import random
     from playwright.sync_api import sync_playwright
 
-    jo = str(random.randint(1, 5))
+    # 조를 섞어 넘긴다 — 같은 조를 반복해서 고르지 않도록(번호 소진 대비).
+    jo_order = [str(j) for j in random.sample(range(1, 6), k=_WIN720_JO_PICKS)]
     cookies = _session_cookies(client)
     dialogs = []
     with sync_playwright() as p:
@@ -190,14 +228,28 @@ def _win720_attempt(client):
         # 확인창은 수락하되 문구를 남긴다 — 조용한 실패(사유 유실)를 막는 핵심.
         page.on("dialog", lambda d: (dialogs.append(d.message), d.accept()))
         try:
-            round_no, buy_no = _win720_interaction(page, jo, dialogs)
+            round_no, buy_no = _win720_interaction(page, jo_order, dialogs)
         finally:
             browser.close()
     return _win720_ticket(round_no, buy_no)
 
 
-def _win720_interaction(page, jo, dialogs):
-    """연금 게임 iframe DOM 조작. 반환: (round_no, buy_no)."""
+def _select_numbers(fr, page, jo):
+    """한 조를 골라 자동번호 → 선택완료(doVerify). 반환: (buy_no, round) — 미확정이면 ("", "")."""
+    fr.click(f"span.lotto720_box.jogroup.num{jo}"); page.wait_for_timeout(400)   # 단일 조
+    fr.click("a.lotto720_btn_auto_number"); page.wait_for_timeout(700)           # 자동 6자리
+    fr.click("a.lotto720_btn_confirm_number"); page.wait_for_timeout(900)        # 선택 완료(doVerify)
+    buyno = fr.evaluate("()=>{var e=document.querySelector('#frm input[name=BUY_NO]'); return e?e.value:'';}")
+    rnd = fr.evaluate("()=>{var e=document.getElementById('DROUND')||document.getElementById('ROUND'); return e?e.value:'';}")
+    return buyno, rnd
+
+
+def _win720_interaction(page, jo_order, dialogs):
+    """연금 게임 iframe DOM 조작. 반환: (round_no, buy_no).
+
+    번호가 확정되지 않으면 **다른 조로 새 자동번호를 다시 뽑는다**(같은 페이지 안에서).
+    연금복권720+는 조·번호별 발행량이 한정돼 있어 자동으로 뽑힌 번호가 이미 소진됐을 수 있고,
+    그때는 브라우저를 다시 띄울 필요 없이 번호만 바꾸면 된다."""
     page.goto(_WIN720_URL, timeout=25000, wait_until="networkidle")
     page.wait_for_timeout(2500)
     fr = page.frame(name="ifrm_tab")
@@ -210,15 +262,25 @@ def _win720_interaction(page, jo, dialogs):
                 el.click(); page.wait_for_timeout(300)
         except Exception:
             pass
-    fr.click(f"span.lotto720_box.jogroup.num{jo}"); page.wait_for_timeout(400)   # 단일 조
-    fr.click("a.lotto720_btn_auto_number"); page.wait_for_timeout(700)           # 자동 6자리
-    fr.click("a.lotto720_btn_confirm_number"); page.wait_for_timeout(900)        # 선택 완료(doVerify)
-    buyno = fr.evaluate("()=>{var e=document.querySelector('#frm input[name=BUY_NO]'); return e?e.value:'';}")
-    rnd = fr.evaluate("()=>{var e=document.getElementById('DROUND')||document.getElementById('ROUND'); return e?e.value:'';}")
+
+    buyno = rnd = ""
+    for n, jo in enumerate(jo_order, start=1):
+        mark = len(dialogs)
+        buyno, rnd = _select_numbers(fr, page, jo)
+        if buyno and rnd:
+            break
+        seen = dialogs[mark:]
+        if _hard_stop_reason(seen):        # 계정·회차 사유면 조를 바꿔도 소용없다
+            break
+        log(f"[WIN720] {jo}조 번호 미확정({n}/{len(jo_order)}) — 다른 조로 재선택: "
+            f"{_retry_hint(seen) or (seen[0] if seen else '안내 없음')}")
+
     if not buyno or not rnd:
         stop = _hard_stop_reason(dialogs)
         raise Win720Error(f"연금 번호/회차 미확정 (BUY_NO={buyno!r}, ROUND={rnd!r})"
-                          + (f" / 안내: {stop}" if stop else ""), hard_stop=bool(stop))
+                          + (f" / 안내: {stop}" if stop else "")
+                          + (f" / 시도한 조: {list(jo_order)}" if not stop else ""),
+                          hard_stop=bool(stop))
     # 여기부터 주문이 나갈 수 있다 — 이후 실패는 반드시 round_no를 달고 던진다(원장 확인용).
     # 클릭은 확인창과 엉키므로 JS 함수 직접 호출
     try:
