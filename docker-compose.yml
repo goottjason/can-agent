@@ -12,7 +12,7 @@ services:
       DB_PORT: 5432
       DB_NAME: canagent
       DB_USERNAME: canagent
-      DB_PASSWORD: ${PG_PASSWORD:-canagent1234}
+      DB_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD must be set in .env}
       DART_API_KEY: ${DART_API_KEY}
       KRX_API_KEY: ${KRX_API_KEY}
       KOREA_INVESTMENT_APP_KEY: ${KOREA_INVESTMENT_APP_KEY}

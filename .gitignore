@@ -26,6 +26,8 @@ logs/
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
 
 # H2 Database
 *.db

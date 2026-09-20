@@ -171,7 +171,7 @@ services:
     environment:
       POSTGRES_DB: canagent
       POSTGRES_USER: canagent
-      POSTGRES_PASSWORD: canagent1234
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data  # 데이터 영구 저장
 
