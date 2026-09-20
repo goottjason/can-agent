@@ -9,3 +9,11 @@ docs
 .env.*
 *.key
 *.pem
+# 배포 스크립트·워크플로는 이미지에 필요 없다(바뀌어도 서버 빌드 캐시를 깨지 않도록)
+.github
+ops
+deploy.sh
+.claude
+docker-compose.yml
+.gitignore
+.dockerignore
